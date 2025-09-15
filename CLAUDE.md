@@ -8,7 +8,7 @@ FastAPI-based plagiarism detection system using vector embeddings, designed with
 
 The system uses:
 
-- **OpenAI-compatible API** for text embeddings (configured for Qwen3-Embedding-4B model via vect.one)
+- **OpenAI-compatible API** for text embeddings (configured for Qwen3-Embedding-8B model via vect.one)
 - **Milvus vector database** with dual-mode support (local file-based for development, server for production)
 - **FastAPI** for REST API endpoints
 
@@ -100,8 +100,8 @@ Key environment variables in `.env`:
 
 - `OPENAI_API_KEY`: Required for embedding API access
 - `OPENAI_BASE_URL`: Custom endpoint (currently using vect.one)
-- `OPENAI_MODEL`: Embedding model (Qwen3-Embedding-4B)
-- `OPENAI_DIMENSIONS`: Vector dimensions (2560 for current model)
+- `OPENAI_MODEL`: Embedding model (Qwen3-Embedding-8B)
+- `OPENAI_DIMENSIONS`: Vector dimensions (4096 for current model)
 - `MILVUS_MODE`: Storage mode (local/server)
 
 ### Development Workflow
@@ -118,8 +118,8 @@ Current implementation status tracked in todo list - use TodoWrite to update pro
 
 ### Important Implementation Notes
 
-- **Embedding Model**: Using Qwen3-Embedding-4B via vect.one API (it is OpenAI API compatible)
-- **Vector Dimensions**: 2560
+- **Embedding Model**: Using Qwen3-Embedding-8B via vect.one API (it is OpenAI API compatible)
+- **Vector Dimensions**: 4096
 - **Batch Size**: Reduced to 20 for current model limitations
 - **Local Development**: Always start with `MILVUS_MODE=local` to avoid server dependencies
 - **Schema Management**: MilvusClient handles schema automatically in local mode, explicit schema required for server mode
@@ -149,7 +149,7 @@ import asyncio
 async def test():
     service = EmbeddingService()
     vector = await service.embed_text("test")
-    print(f"Vector dimensions: {len(vector)}")  # Should be 2560
+    print(f"Vector dimensions: {len(vector)}")  # Should be 4096
 
 asyncio.run(test())
 ```
