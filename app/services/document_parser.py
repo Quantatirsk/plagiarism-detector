@@ -9,18 +9,18 @@
 - 其他文本格式 (.rst, .py, .js 等)
 """
 
-import logging
 from typing import Optional, Dict, Any
 from pathlib import Path
 from app.tools.readers import get_readers_service
+from app.services.base_service import BaseService, singleton
 
-logger = logging.getLogger(__name__)
 
-
-class DocumentParser:
+@singleton
+class DocumentParser(BaseService):
     """文档解析器 - 支持多种格式"""
 
-    def __init__(self):
+    def _initialize(self):
+        """初始化文档解析器"""
         self.readers_service = get_readers_service()
 
     def parse_document(self, file_path: str) -> Optional[str]:
@@ -33,27 +33,28 @@ class DocumentParser:
         Returns:
             解析的纯文本内容，失败返回None
         """
+        self._ensure_initialized()
         try:
             # 检查文件是否存在
             if not Path(file_path).exists():
-                logger.error(f"文件不存在: {file_path}")
+                self.logger.error(f"文件不存在: {file_path}")
                 return None
 
             # 使用readers_service解析文档
             content = self.readers_service.parse_document(file_path)
 
             if content is None:
-                logger.warning(f"无法解析文档: {file_path}")
+                self.logger.warning(f"无法解析文档: {file_path}")
                 return None
 
             # 基本文本清理
             content = self._clean_text(content)
 
-            logger.info(f"成功解析文档 {file_path}, 提取了 {len(content)} 个字符")
+            self.logger.info(f"成功解析文档 {file_path}, 提取了 {len(content)} 个字符")
             return content
 
         except Exception as e:
-            logger.error(f"解析文档时出错 {file_path}: {e}")
+            self.logger.error(f"解析文档时出错 {file_path}: {e}")
             return None
 
     def get_document_info(self, file_path: str) -> Dict[str, Any]:
@@ -66,6 +67,7 @@ class DocumentParser:
         Returns:
             文档信息字典
         """
+        self._ensure_initialized()
         try:
             path = Path(file_path)
 
@@ -89,7 +91,7 @@ class DocumentParser:
             return info
 
         except Exception as e:
-            logger.error(f"获取文档信息时出错 {file_path}: {e}")
+            self.logger.error(f"获取文档信息时出错 {file_path}: {e}")
             return {
                 'filename': Path(file_path).name,
                 'extension': '',
@@ -160,14 +162,3 @@ class DocumentParser:
             cleaned_lines.pop()
 
         return '\n'.join(cleaned_lines)
-
-
-# 全局实例
-_document_parser = None
-
-def get_document_parser() -> DocumentParser:
-    """获取全局文档解析器实例"""
-    global _document_parser
-    if _document_parser is None:
-        _document_parser = DocumentParser()
-    return _document_parser

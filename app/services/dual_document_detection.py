@@ -4,28 +4,29 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import uuid
+from enum import Enum
 
-from app.services.embedding import EmbeddingService
-from app.services.text_processor import TextProcessor
-from app.services.document_parser import get_document_parser
 from app.models.detection import SimilarityMatch
-from app.models.document import ChunkType
-from app.core.logging import get_logger
-
-logger = get_logger(__name__)
+from app.core.errors import DocumentParseError, InvalidInputError
+from app.services.base_service import BaseService, singleton
 
 
-class DualDocumentDetectionService:
+class ChunkType(str, Enum):
+    """文本块类型"""
+    PARAGRAPH = "paragraph"
+    SENTENCE = "sentence"
+
+
+@singleton
+class DualDocumentDetectionService(BaseService):
     """双文档检测服务 - 纯计算版本"""
 
-    def __init__(
-        self,
-        embedding_service: EmbeddingService,
-        text_processor: TextProcessor
-    ):
-        self.embedding = embedding_service
-        self.processor = text_processor
-        self.document_parser = get_document_parser()
+    def _initialize(self):
+        """初始化服务依赖"""
+        from app.services.service_factory import service_factory
+        self.embedding = service_factory.get_embedding_service()
+        self.processor = service_factory.get_text_processor()
+        self.document_parser = service_factory.get_document_parser()
 
     async def compare_documents(
         self,
@@ -33,10 +34,10 @@ class DualDocumentDetectionService:
         doc2_path: str,
         granularity: str = "paragraph",
         threshold: Optional[float] = None,
-        top_k_per_query: Optional[int] = None,
         max_total_matches: Optional[int] = None
     ) -> Dict[str, Any]:
         """对比两个文档的相似度（只选一种粒度）"""
+        self._ensure_initialized()
         start_time = datetime.now()
         task_id = str(uuid.uuid4())
 
@@ -45,22 +46,22 @@ class DualDocumentDetectionService:
             doc1_content = self.document_parser.parse_document(doc1_path)
             doc2_content = self.document_parser.parse_document(doc2_path)
 
-            if not doc1_content or not doc2_content:
-                raise ValueError("无法解析文档")
+            if not doc1_content:
+                raise DocumentParseError("无法解析第一个文档", file_path=doc1_path)
+            if not doc2_content:
+                raise DocumentParseError("无法解析第二个文档", file_path=doc2_path)
 
             # 2. 只执行一种粒度检测
             if granularity not in ("paragraph", "sentence"):
-                raise ValueError("granularity must be 'paragraph' or 'sentence'")
+                raise InvalidInputError("granularity must be 'paragraph' or 'sentence'", field="granularity", value=granularity)
 
             chunk_type = ChunkType.PARAGRAPH if granularity == "paragraph" else ChunkType.SENTENCE
-            logger.info(f"Processing with granularity={granularity}, chunk_type={chunk_type.value}")
+            self.logger.info(f"Processing with granularity={granularity}, chunk_type={chunk_type.value}")
             # 默认阈值按粒度选择
             from app.core.config import get_settings
             settings = get_settings()
             if threshold is None:
                 threshold = settings.paragraph_similarity_threshold if chunk_type == ChunkType.PARAGRAPH else settings.sentence_similarity_threshold
-            if top_k_per_query is None:
-                top_k_per_query = settings.top_k_per_query
             if max_total_matches is None:
                 max_total_matches = settings.max_total_matches
 
@@ -68,15 +69,15 @@ class DualDocumentDetectionService:
             if chunk_type == ChunkType.PARAGRAPH:
                 doc1_spans = self.processor.split_paragraphs_with_spans(doc1_content)
                 doc2_spans = self.processor.split_paragraphs_with_spans(doc2_content)
-                logger.info(f"Split into {len(doc1_spans)} paragraphs and {len(doc2_spans)} paragraphs")
+                self.logger.info(f"Split into {len(doc1_spans)} paragraphs and {len(doc2_spans)} paragraphs")
             else:
                 doc1_spans = self.processor.split_sentences_with_spans(doc1_content)
                 doc2_spans = self.processor.split_sentences_with_spans(doc2_content)
-                logger.info(f"Split into {len(doc1_spans)} sentences and {len(doc2_spans)} sentences")
+                self.logger.info(f"Split into {len(doc1_spans)} sentences and {len(doc2_spans)} sentences")
 
             # 计算匹配（当前内部也会分割一次，为保证正确先修复功能，后续可去重优化）
             matches = await self._find_matches(
-                doc1_content, doc2_content, chunk_type, threshold, top_k_per_query, max_total_matches
+                doc1_content, doc2_content, chunk_type, threshold, max_total_matches
             )
 
             processing_time = (datetime.now() - start_time).total_seconds()
@@ -108,7 +109,7 @@ class DualDocumentDetectionService:
             }
 
         except Exception as e:
-            logger.error(f"Document comparison failed: {e}")
+            self.logger.error(f"Document comparison failed: {e}")
             raise
 
     async def _find_matches(
@@ -117,10 +118,9 @@ class DualDocumentDetectionService:
         doc2_content: str,
         chunk_type: ChunkType,
         threshold: float,
-        top_k_per_query: int,
         max_total_matches: int
     ) -> List[SimilarityMatch]:
-        """矩阵化计算两个文档的块相似度，并按阈值与 top-k 过滤"""
+        """矩阵化计算两个文档的块相似度，并按阈值过滤"""
 
         # 分割文档并获取块与偏移
         if chunk_type == ChunkType.PARAGRAPH:
@@ -136,14 +136,13 @@ class DualDocumentDetectionService:
         if not doc1_chunks or not doc2_chunks:
             return []
 
-        logger.info(f"matching: type={chunk_type.value}, doc1={len(doc1_chunks)} chunks, doc2={len(doc2_chunks)} chunks, threshold={threshold}")
+        self.logger.info(f"matching: type={chunk_type.value}, doc1={len(doc1_chunks)} chunks, doc2={len(doc2_chunks)} chunks, threshold={threshold}")
 
         # 批量嵌入
         doc1_embeddings = await self.embedding.embed_batch(doc1_chunks)
         doc2_embeddings = await self.embedding.embed_batch(doc2_chunks)
 
         import numpy as np
-        from scipy.optimize import linear_sum_assignment
         # 转为矩阵并做 L2 归一化
         E1 = np.array(doc1_embeddings, dtype=float)
         E2 = np.array(doc2_embeddings, dtype=float)
@@ -164,36 +163,7 @@ class DualDocumentDetectionService:
         matches: List[SimilarityMatch] = []
         n1, n2 = S.shape
 
-        if chunk_type == ChunkType.SENTENCE:
-            # 句子级：强制一对一匹配（每个A句子只对应一个B句子，且全局不重复）
-            # 使用匈牙利算法在最大化相似度下求解一对一分配
-            cost = 1.0 - S  # 相似度越高，代价越低
-            row_ind, col_ind = linear_sum_assignment(cost)
-            pairs = []
-            for i, j in zip(row_ind.tolist(), col_ind.tolist()):
-                sim = float(S[i, j])
-                if sim >= threshold:
-                    pairs.append((i, j, sim))
-
-            # 选取全局相似度最高的前 max_total_matches 个
-            pairs.sort(key=lambda x: x[2], reverse=True)
-            for i, j, sim in pairs[:max_total_matches]:
-                matches.append(SimilarityMatch(
-                    query_text=doc1_chunks[i],
-                    matched_text=doc2_chunks[j],
-                    similarity_score=sim,
-                    document_id=f"doc2_{chunk_type.value}",
-                    query_document_id=f"doc1_{chunk_type.value}",
-                    position=int(j),
-                    query_index=int(i),
-                    match_index=int(j)
-                ))
-
-            # 排序返回
-            matches.sort(key=lambda x: x.similarity_score, reverse=True)
-            return matches
-
-        # 段落级：全局最优一对一匹配
+        # 句子级和段落级都使用贪心算法：全局最优一对一匹配
         # 收集所有满足阈值的候选匹配对
         candidates = []
         for i in range(n1):
@@ -237,20 +207,3 @@ class DualDocumentDetectionService:
         return matches
 
     # 已用矩阵化方式计算余弦相似度
-
-
-# 全局实例
-_dual_detection_service = None
-
-def get_dual_detection_service() -> DualDocumentDetectionService:
-    """获取双文档检测服务实例"""
-    global _dual_detection_service
-    if _dual_detection_service is None:
-        from app.services.embedding import get_embedding_service
-        from app.services.text_processor import get_text_processor
-
-        _dual_detection_service = DualDocumentDetectionService(
-            embedding_service=get_embedding_service(),
-            text_processor=get_text_processor()
-        )
-    return _dual_detection_service

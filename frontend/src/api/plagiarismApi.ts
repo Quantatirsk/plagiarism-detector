@@ -31,7 +31,6 @@ export interface ComparisonRequest {
   document2: File;
   granularity: Granularity;
   threshold?: number; // 可选；不提供则后端按粒度默认
-  top_k_per_query?: number; // 段落模式生效
   max_total_matches?: number; // 全局上限
 }
 
@@ -82,9 +81,6 @@ export const plagiarismApi = {
     formData.append('granularity', request.granularity);
     if (request.threshold) {
       formData.append('threshold', request.threshold.toString());
-    }
-    if (request.top_k_per_query) {
-      formData.append('top_k_per_query', request.top_k_per_query.toString());
     }
     if (request.max_total_matches) {
       formData.append('max_total_matches', request.max_total_matches.toString());

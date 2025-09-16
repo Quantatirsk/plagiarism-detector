@@ -9,6 +9,8 @@ export interface ProcessedMatch {
   document_id: string;
   position: number;
   level: 'very-high' | 'high' | 'medium' | 'low';
+  startIndex: number;
+  endIndex: number;
 }
 
 interface SimilarityHighlighterProps {

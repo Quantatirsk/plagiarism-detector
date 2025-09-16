@@ -1,112 +1,72 @@
 """
 文本处理服务 - 文本分割、清理等基础功能
-使用 spaCy 进行中英文句子分割
+使用 spaCy 进行中英文句子分割，支持混合语言文档
 """
 import re
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 import spacy
-from spacy.lang.zh import Chinese
-from spacy.lang.en import English
 from spacy.language import Language
-from app.core.logging import get_logger
+from langdetect import detect, LangDetectException
+from app.services.base_service import BaseService, singleton
 
-logger = get_logger(__name__)
 
+@singleton
+class TextProcessor(BaseService):
+    """文本处理服务 - 使用 spaCy 进行智能文本处理，支持中英文混合"""
 
-class TextProcessor:
-    """文本处理服务 - 使用 spaCy 进行智能文本处理"""
-
-    def __init__(self):
+    def _initialize(self):
         """初始化 spaCy 模型"""
         self.nlp_zh = None
         self.nlp_en = None
+        self._init_chinese_model()
+        self._init_english_model()
 
-        # 尝试加载中文模型
+    def _init_chinese_model(self):
+        """初始化中文模型"""
         try:
-            self.nlp_zh = spacy.load("zh_core_web_sm", exclude=["parser", "senter"])
-            # 添加sentencizer以进行基本句子分割
+            # 加载中文模型，排除parser和senter以提高性能
+            self.nlp_zh = spacy.load("zh_core_web_md", exclude=["parser", "senter"])
+            # 添加sentencizer进行基本句子分割
             self.nlp_zh.add_pipe("sentencizer")
-            # 添加自定义句子边界规则
-            self._configure_chinese_sentence_boundaries(self.nlp_zh)
-            logger.info("成功加载中文 spaCy 模型并配置自定义规则")
+            # 配置自定义规则
+            self._configure_chinese_sentence_boundaries()
+            self.logger.info("成功加载中文 spaCy 模型并配置自定义规则")
         except OSError:
-            logger.warning("中文 spaCy 模型未找到，请运行: python -m spacy download zh_core_web_sm")
-            # 使用基础中文语言类
-            self.nlp_zh = Chinese()
-            self.nlp_zh.add_pipe("sentencizer")
-            self._configure_chinese_sentence_boundaries(self.nlp_zh)
+            self.logger.error("中文 spaCy 模型未找到，请运行: python -m spacy download zh_core_web_md")
+            raise
 
-        # 尝试加载英文模型
+    def _init_english_model(self):
+        """初始化英文模型"""
         try:
-            self.nlp_en = spacy.load("en_core_web_sm", exclude=["parser", "senter"])
-            # 添加sentencizer以进行基本句子分割
-            self.nlp_en.add_pipe("sentencizer")
-            # 添加自定义句子边界规则
-            self._configure_english_sentence_boundaries(self.nlp_en)
-            logger.info("成功加载英文 spaCy 模型并配置自定义规则")
+            # 加载英文模型（保持默认配置）
+            self.nlp_en = spacy.load("en_core_web_md")
+            self.logger.info("成功加载英文 spaCy 模型")
         except OSError:
-            logger.warning("英文 spaCy 模型未找到，请运行: python -m spacy download en_core_web_sm")
-            # 使用基础英文语言类
-            self.nlp_en = English()
-            self.nlp_en.add_pipe("sentencizer")
-            self._configure_english_sentence_boundaries(self.nlp_en)
+            self.logger.error("英文 spaCy 模型未找到，请运行: python -m spacy download en_core_web_md")
+            raise
 
-    def _configure_chinese_sentence_boundaries(self, nlp):
+    def _configure_chinese_sentence_boundaries(self):
         """配置中文句子边界检测规则"""
-        # 确保有句子分割器
-        if "sentencizer" not in nlp.pipe_names and "parser" not in nlp.pipe_names:
-            nlp.add_pipe("sentencizer")
+        # 确保 nlp_zh 不是 None
+        if not self.nlp_zh:
+            return
 
-        @Language.component("chinese_sentence_rules")
-        def chinese_sentence_rules(doc):
-            """自定义中文句子分割规则 - 在sentencizer之后运行"""
-            # 首先确保有基本的句子边界
-            if not any(token.is_sent_start for token in doc):
-                # 如果没有句子边界，使用基本规则设置
-                for i, token in enumerate(doc):
-                    if i == 0:
-                        token.is_sent_start = True
-                    elif token.text in ["。", "！", "？", "；"]:
-                        if i + 1 < len(doc):
-                            doc[i + 1].is_sent_start = True
-
-            # 应用自定义规则
+        @Language.component("zh_number_protector")
+        def zh_number_protector(doc):
+            """保护序号不被单独分割成句子"""
             for i, token in enumerate(doc):
-                # 处理换行符 - 在换行符后开始新句子
-                if token.is_space and "\n" in token.text:
-                    # 如果下一个token存在且不是空白，则标记为句子开始
-                    if i + 1 < len(doc) and not doc[i + 1].is_space:
-                        doc[i + 1].is_sent_start = True
+                # 如果是数字后的句号
+                if (token.text == "." and i > 0 and
+                    doc[i-1].text.isdigit() and
+                    i + 1 < len(doc)):
+                    # 不要在这里分句
+                    doc[i + 1].is_sent_start = False
 
-                    # 特殊处理：如果是双换行（段落分隔），确保分割
-                    if "\n\n" in token.text:
-                        # 标记前一个非空白token为句子结束位置
-                        j = i - 1
-                        while j >= 0 and doc[j].is_space:
-                            j -= 1
-                        # 如果前面有标点符号，确保其后是句子边界
-                        if j >= 0 and doc[j].text in ["。", "！", "？", "；", "）", "】", "】"]:
-                            if j + 1 < len(doc):
-                                k = j + 1
-                                while k < len(doc) and doc[k].is_space:
-                                    k += 1
-                                if k < len(doc):
-                                    doc[k].is_sent_start = True
-
-                # 不要在称谓后分割
-                elif token.text in ["先生", "女士", "老师", "医生", "教授", "博士", "同学", "同志"]:
-                    if i + 1 < len(doc) and doc[i + 1].is_sent_start:
-                        doc[i + 1].is_sent_start = False
-
-                # 不要在省略号后立即分割
-                elif token.text in ["...", "……", "…"]:
-                    if i + 1 < len(doc) and doc[i + 1].is_sent_start:
-                        doc[i + 1].is_sent_start = False
-
-                # 在某些连接词前强制分割
-                elif token.text in ["总之", "因此", "所以", "然而", "但是", "可是", "另外", "此外", "首先", "其次", "最后"]:
-                    if i > 0 and not token.is_sent_start:
-                        token.is_sent_start = True
+                # 如果整个段落只是一个序号（如 "2."），不作为独立句子
+                if len(doc) <= 3 and any(t.text.isdigit() for t in doc) and any(t.text == "." for t in doc):
+                    for j in range(len(doc)):
+                        if j > 0:
+                            doc[j].is_sent_start = False
 
             return doc
 
@@ -114,7 +74,7 @@ class TextProcessor:
         def merge_short_sentences_zh(doc):
             """合并过短的句子以提高语义丰富度"""
             # 最小句子长度（词元数）
-            min_tokens = 8  # 中文句子至少8个词
+            min_tokens = 4  # 中文句子至少4个词
 
             # 收集当前句子边界
             sent_starts = []
@@ -135,22 +95,12 @@ class TextProcessor:
 
                 # 如果句子太短
                 if sent_length < min_tokens and i + 1 < len(sent_starts):
-                    # 检查是否包含换行符（不跨段落合并）
-                    sent_span = doc[start_idx:end_idx]
-                    has_newline = any(token.text == "\n" for token in sent_span)
-
-                    # 检查下一句是否以换行开始（标题后的正文不合并）
-                    next_start = sent_starts[i + 1]
-                    starts_with_newline = False
-                    if next_start > 0 and doc[next_start - 1].text == "\n":
-                        starts_with_newline = True
-
                     # 检查是否是独立的短句（感叹句或疑问句）
-                    sent_text = sent_span.text
+                    sent_text = doc[start_idx:end_idx].text
                     is_independent = any(punct in sent_text for punct in ["！", "？"])
 
-                    # 如果没有换行符、不是独立短句、且下一句不是新段落，则可以合并
-                    if not has_newline and not starts_with_newline and not is_independent:
+                    # 如果不是独立短句，则可以合并
+                    if not is_independent:
                         should_keep = False
 
                 if should_keep or i == 0:  # 第一个句子总是保留
@@ -167,185 +117,320 @@ class TextProcessor:
 
             return doc
 
-        # 添加自定义组件
-        if "chinese_sentence_rules" not in nlp.pipe_names:
-            nlp.add_pipe("chinese_sentence_rules", after="sentencizer" if "sentencizer" in nlp.pipe_names else None)
-        if "merge_short_sentences_zh" not in nlp.pipe_names:
-            nlp.add_pipe("merge_short_sentences_zh", after="chinese_sentence_rules")
-
-    def _configure_english_sentence_boundaries(self, nlp):
-        """配置英文句子边界检测规则"""
-        # 确保有句子分割器
-        if "sentencizer" not in nlp.pipe_names and "parser" not in nlp.pipe_names:
-            nlp.add_pipe("sentencizer")
-
-        @Language.component("english_sentence_rules")
-        def english_sentence_rules(doc):
-            """自定义英文句子分割规则"""
-            for i, token in enumerate(doc):
-                # 不要在缩写后分割
-                if token.text.lower() in ["dr", "mr", "mrs", "ms", "prof", "sr", "jr"]:
-                    if i + 1 < len(doc) and doc[i + 1].text == ".":
-                        if i + 2 < len(doc):
-                            doc[i + 2].is_sent_start = False
-
-                # 不要在省略号后立即分割
-                elif token.text == "...":
-                    if i + 1 < len(doc):
-                        doc[i + 1].is_sent_start = False
-
-            return doc
-
-        @Language.component("merge_short_english_sentences")
-        def merge_short_english_sentences(doc):
-            """合并过短的英文句子"""
-            # 最小句子长度（词元数）
-            min_tokens = 6  # 英文句子至少6个词
-
-            for i, token in enumerate(doc):
-                if i == 0:
-                    token.is_sent_start = True
-                    continue
-
-                if token.is_sent_start or token.is_sent_start is None:
-                    sent_length = 0
-                    for j in range(i, len(doc)):
-                        if j > i and (doc[j].is_sent_start or doc[j].is_sent_start is None):
-                            break
-                        sent_length += 1
-
-                    # 如果句子太短，合并到下一句
-                    if sent_length < min_tokens and i < len(doc) - sent_length:
-                        # 检查是否是独立的短句
-                        sent_text = doc[i:i+sent_length].text
-                        if not any(punct in sent_text for punct in ["!", "?"]):
-                            token.is_sent_start = False
-
-            return doc
-
-        # 添加自定义组件
-        if "english_sentence_rules" not in nlp.pipe_names:
-            nlp.add_pipe("english_sentence_rules", before="parser" if "parser" in nlp.pipe_names else None)
-        if "merge_short_english_sentences" not in nlp.pipe_names:
-            nlp.add_pipe("merge_short_english_sentences", after="english_sentence_rules")
+        # 添加自定义组件到管道
+        if "zh_number_protector" not in self.nlp_zh.pipe_names:
+            self.nlp_zh.add_pipe("zh_number_protector", after="sentencizer")
+        if "merge_short_sentences_zh" not in self.nlp_zh.pipe_names:
+            self.nlp_zh.add_pipe("merge_short_sentences_zh", after="zh_number_protector")
 
     def detect_language(self, text: str) -> str:
-        """检测文本语言（简单实现）"""
-        # 统计中文字符
-        chinese_chars = sum(1 for char in text if '\u4e00' <= char <= '\u9fff')
-        # 统计所有字母字符
-        total_alpha = sum(1 for char in text if char.isalpha())
+        """
+        使用 langdetect 检测文本语言
+        返回 'zh' 或 'en'
+        """
+        # 清理文本
+        clean_text = text.strip()
 
-        if total_alpha == 0:
-            return "unknown"
+        if not clean_text:
+            return 'zh'
 
-        # 如果中文字符占比超过30%，认为是中文
-        chinese_ratio = chinese_chars / total_alpha
-        return "zh" if chinese_ratio > 0.3 else "en"
+        try:
+            # 使用langdetect检测语言
+            lang = detect(clean_text)
 
-    @staticmethod
-    def split_paragraphs(text: str, min_length: int = 20) -> List[str]:
-        """分割段落 - 简单规则"""
-        # 按双换行符分割
-        paragraphs = re.split(r'\n\n+', text)
-        # 过滤太短的段落 - 降低阈值适配中文文本
-        return [p.strip() for p in paragraphs if len(p.strip()) > min_length]
+            if lang in ['zh-cn', 'zh-tw']:
+                return 'zh'
+            elif lang == 'en':
+                return 'en'
+            else:
+                # 其他语言默认使用中文模型
+                return 'zh'
 
-    @staticmethod
-    def split_paragraphs_with_spans(text: str, min_length: int = 20) -> List[Tuple[str, int, int]]:
-        """分割段落并返回(start,end)偏移（相对全文）"""
-        normalized = text.replace("\r\n", "\n").replace("\r", "\n")
-        parts = re.split(r'\n\n+', normalized)
-        spans: List[Tuple[str, int, int]] = []
-        cursor = 0
-        for part in parts:
-            if not part:
-                continue
-            # 找到该部分在全文中的位置（从cursor开始，确保顺序）
-            idx = normalized.find(part, cursor)
-            if idx == -1:
-                # 回退到全文搜索（极端情况下）
-                idx = normalized.find(part)
-                if idx == -1:
-                    continue
-            start = idx
-            end = idx + len(part)
-            # 去除外侧空白，确保高亮贴合实际字符
-            trimmed = part.strip()
-            if len(trimmed) <= min_length:
-                cursor = end
-                continue
-            # 计算去除空白后的偏移
-            leading = len(part) - len(part.lstrip())
-            trailing = len(part) - len(part.rstrip())
-            start += leading
-            end -= trailing
-            spans.append((normalized[start:end], start, end))
-            cursor = idx + len(part)
-        return spans
-    
-    def split_sentences(self, text: str, min_length: int = 20) -> List[str]:
-        """使用 spaCy 分割句子 - 支持中英文"""
+        except LangDetectException:
+            # 检测失败默认使用中文模型
+            self.logger.warning(f"语言检测失败，默认使用中文模型")
+            return 'zh'
+
+    def split_paragraphs(self, text: str, min_length: int = 20, max_chars: int = 600) -> List[str]:
+        """分割段落 - 使用单换行符作为段落分隔符，并对超长段落进行分割"""
+        self._ensure_initialized()
+        # 按单个换行符分割
+        lines = text.split('\n')
+        # 过滤空行和太短的段落
+        paragraphs = []
+        for line in lines:
+            line = line.strip()
+            if line and len(line) > min_length:
+                # 对超长段落进行分割
+                sub_paragraphs = self._split_long_paragraph_internal(line, max_chars)
+                paragraphs.extend(sub_paragraphs)
+        return paragraphs
+
+    def _split_long_paragraph_internal(self, paragraph: str, max_chars: int = 600) -> List[str]:
+        """分割超长段落，确保不超过最大字符数限制"""
+        # 使用 langdetect 检测语言类型
+        lang = self.detect_language(paragraph)
+        is_chinese = (lang == 'zh')
+
+        # 如果段落长度在限制内，直接返回
+        if len(paragraph) <= max_chars:
+            return [paragraph]
+
+        result = []
+        remaining = paragraph
+
+        while len(remaining) > max_chars:
+            # 寻找分割点：优先使用句号，其次分号
+            if is_chinese:
+                # 中文：优先句号，其次分号
+                delimiters = ['。', '；']
+            else:
+                # 英文：优先句号，其次分号
+                delimiters = ['. ', '; ']
+
+            # 在段落中间位置附近寻找最佳分割点
+            mid_point = len(remaining) // 2
+            best_split = -1
+            best_distance = float('inf')
+
+            for delimiter in delimiters:
+                # 在整个段落中查找所有分隔符位置
+                pos = 0
+                while True:
+                    idx = remaining.find(delimiter, pos)
+                    if idx == -1:
+                        break
+                    # 计算与中点的距离
+                    distance = abs(idx + len(delimiter) - mid_point)
+                    if distance < best_distance:
+                        best_distance = distance
+                        best_split = idx + len(delimiter)
+                    pos = idx + 1
+
+                # 如果找到合适的分割点，就使用它
+                if best_split > 0:
+                    break
+
+            # 如果没有找到合适的分隔符，强制在中点分割
+            if best_split <= 0:
+                # 尝试在空格处分割（避免断词）
+                if not is_chinese:
+                    # 英文：在中点附近找空格
+                    space_idx = remaining.rfind(' ', 0, mid_point)
+                    if space_idx > 0:
+                        best_split = space_idx + 1
+                    else:
+                        best_split = mid_point
+                else:
+                    # 中文：直接在中点分割
+                    best_split = mid_point
+
+            # 执行分割
+            part = remaining[:best_split].strip()
+            if part:
+                result.append(part)
+            remaining = remaining[best_split:].strip()
+
+        # 添加剩余部分
+        if remaining:
+            result.append(remaining)
+
+        return result
+
+    def split_paragraphs_with_spans(self, text: str, min_length: int = 20, max_chars: int = 600) -> List[Tuple[str, int, int]]:
+        """
+        分割段落并返回(text, start, end)偏移
+        使用单换行符作为段落分隔符，并对超长段落进行分割
+        """
+        self._ensure_initialized()
         if not text:
             return []
 
-        # 检测语言
-        lang = self.detect_language(text)
+        spans: List[Tuple[str, int, int]] = []
+        lines = text.split('\n')
+        current_pos = 0
 
-        # 中文文本使用更短的最小长度阈值
-        actual_min_length = 10 if lang == "zh" else min_length
+        for line in lines:
+            line_start = current_pos
+            line_stripped = line.strip()
 
-        # 选择合适的模型
-        if lang == "zh" and self.nlp_zh:
-            nlp = self.nlp_zh
-        elif lang == "en" and self.nlp_en:
-            nlp = self.nlp_en
-        else:
-            # 回退到正则表达式方法
-            return self._split_sentences_regex(text, actual_min_length)
+            # 只处理非空且足够长的段落
+            if line_stripped and len(line_stripped) > min_length:
+                # 找到 stripped line 在原始 line 中的位置
+                strip_start = line.find(line_stripped)
+                if strip_start >= 0:
+                    # 对超长段落进行分割
+                    sub_paragraphs = self._split_long_paragraph_internal(line_stripped, max_chars)
 
-        try:
-            # 使用 spaCy 处理文本
-            doc = nlp(text)
+                    # 计算每个子段落的位置
+                    sub_start = 0
+                    for sub_para in sub_paragraphs:
+                        # 在原始段落中找到子段落的位置
+                        sub_idx = line_stripped.find(sub_para, sub_start)
+                        if sub_idx >= 0:
+                            actual_start = line_start + strip_start + sub_idx
+                            actual_end = actual_start + len(sub_para)
+                            spans.append((sub_para, actual_start, actual_end))
+                            sub_start = sub_idx + len(sub_para)
 
-            # 提取句子
-            sentences = []
-            for sent in doc.sents:
-                sentence_text = sent.text.strip()
-                # 过滤太短的句子
-                if sentence_text and len(sentence_text) >= actual_min_length:
-                    sentences.append(sentence_text)
+            # 更新位置（包括换行符）
+            current_pos += len(line) + 1  # +1 for newline
 
-            return sentences
+        return spans
 
-        except Exception as e:
-            logger.error(f"spaCy 句子分割失败: {e}")
-            # 回退到正则表达式方法
-            return self._split_sentences_regex(text, actual_min_length)
+    def split_sentences(self, text: str, min_length: int = 20) -> List[str]:
+        """
+        使用双语言模型分割句子
+        先按行分割，然后根据每行的语言选择对应的模型
+        """
+        if not text:
+            return []
+
+        # 按单个换行符分割成行
+        lines = text.split('\n')
+        all_sentences = []
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # 检测这一行的语言
+            lang = self.detect_language(line)
+
+            # 中文文本使用更短的最小长度阈值
+            actual_min_length = 10 if lang == "zh" else min_length
+
+            # 选择合适的模型
+            if lang == "zh" and self.nlp_zh:
+                nlp = self.nlp_zh
+            elif lang == "en" and self.nlp_en:
+                nlp = self.nlp_en
+            else:
+                # 回退到正则表达式方法
+                sentences = self._split_sentences_regex(line, actual_min_length)
+                all_sentences.extend(sentences)
+                continue
+
+            try:
+                # 使用 spaCy 处理文本
+                doc = nlp(line)
+
+                # 提取句子
+                for sent in doc.sents:
+                    sentence_text = sent.text.strip()
+                    # 过滤太短的句子
+                    if sentence_text and len(sentence_text) >= actual_min_length:
+                        all_sentences.append(sentence_text)
+
+            except Exception as e:
+                self.logger.error(f"spaCy 句子分割失败: {e}")
+                # 回退到正则表达式方法
+                sentences = self._split_sentences_regex(line, actual_min_length)
+                all_sentences.extend(sentences)
+
+        return all_sentences
+
+    def split_sentences_with_spans(self, text: str, min_length: int = 20) -> List[Tuple[str, int, int]]:
+        """
+        使用双语言模型分割句子并返回(text, start, end)偏移
+        """
+        if not text:
+            return []
+
+        # 按单个换行符分割成行
+        lines = text.split('\n')
+        all_spans: List[Tuple[str, int, int]] = []
+        text_cursor = 0  # 在原始文本中的位置
+
+        for line in lines:
+            line_start_in_text = text_cursor
+            line_stripped = line.strip()
+
+            if line_stripped:
+                # 检测这一行的语言
+                lang = self.detect_language(line_stripped)
+
+                # 中文文本使用更短的最小长度阈值
+                actual_min_length = 10 if lang == "zh" else min_length
+
+                # 选择合适的模型
+                if lang == "zh" and self.nlp_zh:
+                    nlp = self.nlp_zh
+                elif lang == "en" and self.nlp_en:
+                    nlp = self.nlp_en
+                else:
+                    # 回退到正则表达式方法
+                    spans = self._split_sentences_with_spans_regex(line_stripped, actual_min_length)
+                    # 调整偏移量
+                    for sent_text, start, end in spans:
+                        actual_start = line_start_in_text + line.find(line_stripped) + start
+                        actual_end = line_start_in_text + line.find(line_stripped) + end
+                        all_spans.append((sent_text, actual_start, actual_end))
+                    text_cursor += len(line) + 1  # +1 for newline
+                    continue
+
+                try:
+                    # 使用 spaCy 处理文本
+                    doc = nlp(line_stripped)
+
+                    # 计算 line_stripped 在原始 line 中的偏移
+                    stripped_offset = line.find(line_stripped)
+
+                    # 提取句子和位置
+                    for sent in doc.sents:
+                        sentence_text = sent.text.strip()
+                        # 过滤太短的句子
+                        if sentence_text and len(sentence_text) >= actual_min_length:
+                            # 计算在整个文本中的偏移
+                            start_in_line = sent.start_char
+                            end_in_line = sent.end_char
+
+                            # 去除句子两端的空白字符
+                            while start_in_line < end_in_line and line_stripped[start_in_line].isspace():
+                                start_in_line += 1
+                            while end_in_line > start_in_line and line_stripped[end_in_line - 1].isspace():
+                                end_in_line -= 1
+
+                            # 转换为在整个文本中的偏移
+                            actual_start = line_start_in_text + stripped_offset + start_in_line
+                            actual_end = line_start_in_text + stripped_offset + end_in_line
+
+                            if actual_end > actual_start:
+                                actual_text = text[actual_start:actual_end]
+                                all_spans.append((actual_text, actual_start, actual_end))
+
+                except Exception as e:
+                    self.logger.error(f"spaCy 句子分割（带偏移）失败: {e}")
+                    # 回退到正则表达式方法
+                    spans = self._split_sentences_with_spans_regex(line_stripped, actual_min_length)
+                    # 调整偏移量
+                    for sent_text, start, end in spans:
+                        actual_start = line_start_in_text + line.find(line_stripped) + start
+                        actual_end = line_start_in_text + line.find(line_stripped) + end
+                        all_spans.append((sent_text, actual_start, actual_end))
+
+            # 更新游标位置（包括换行符）
+            text_cursor += len(line) + 1  # +1 for newline
+
+        return all_spans
 
     def _split_sentences_regex(self, text: str, min_length: int = 20) -> List[str]:
         """正则表达式分割句子 - 作为回退方案"""
-        # 将不同换行标准统一
-        normalized = text.replace("\r\n", "\n").replace("\r", "\n")
-
         # 改进的正则表达式：处理中英文标点
-        # 使用正向后顾，保留标点符号
         sentences = []
         # 分割位置：句号、问号、感叹号、分号后
         split_pattern = r'(?<=[.!?。！？；])'
-        parts = re.split(split_pattern, normalized)
+        parts = re.split(split_pattern, text)
 
         current_sentence = ""
         for part in parts:
             current_sentence += part
-            # 如果当前累积的文本以句子结束符结尾，或包含换行符
-            if re.search(r'[.!?。！？；]\s*$', current_sentence) or '\n' in current_sentence:
-                # 按换行符进一步分割
-                sub_parts = current_sentence.split('\n')
-                for sub_part in sub_parts:
-                    sub_part = sub_part.strip()
-                    if sub_part and len(sub_part) >= min_length:
-                        sentences.append(sub_part)
+            # 如果当前累积的文本以句子结束符结尾
+            if re.search(r'[.!?。！？；]\s*$', current_sentence):
+                sentence = current_sentence.strip()
+                if sentence and len(sentence) >= min_length:
+                    sentences.append(sentence)
                 current_sentence = ""
 
         # 处理最后剩余的部分
@@ -353,56 +438,6 @@ class TextProcessor:
             sentences.append(current_sentence.strip())
 
         return sentences
-
-    def split_sentences_with_spans(self, text: str, min_length: int = 20) -> List[Tuple[str, int, int]]:
-        """使用 spaCy 分割句子并返回(start,end)偏移（相对全文）"""
-        if not text:
-            return []
-
-        # 检测语言
-        lang = self.detect_language(text)
-
-        # 中文文本使用更短的最小长度阈值
-        actual_min_length = 10 if lang == "zh" else min_length
-
-        # 选择合适的模型
-        if lang == "zh" and self.nlp_zh:
-            nlp = self.nlp_zh
-        elif lang == "en" and self.nlp_en:
-            nlp = self.nlp_en
-        else:
-            # 回退到正则表达式方法
-            return self._split_sentences_with_spans_regex(text, actual_min_length)
-
-        try:
-            # 使用 spaCy 处理文本
-            doc = nlp(text)
-
-            # 提取句子和位置
-            spans: List[Tuple[str, int, int]] = []
-            for sent in doc.sents:
-                sentence_text = sent.text.strip()
-                # 过滤太短的句子
-                if sentence_text and len(sentence_text) >= actual_min_length:
-                    # spaCy 提供了字符级别的偏移
-                    start = sent.start_char
-                    end = sent.end_char
-                    # 去除句子两端的空白字符
-                    while start < end and text[start].isspace():
-                        start += 1
-                    while end > start and text[end - 1].isspace():
-                        end -= 1
-
-                    if end > start:
-                        actual_text = text[start:end]
-                        spans.append((actual_text, start, end))
-
-            return spans
-
-        except Exception as e:
-            logger.error(f"spaCy 句子分割（带偏移）失败: {e}")
-            # 回退到正则表达式方法
-            return self._split_sentences_with_spans_regex(text, actual_min_length)
 
     def _split_sentences_with_spans_regex(self, text: str, min_length: int = 20) -> List[Tuple[str, int, int]]:
         """正则表达式分割句子并返回偏移 - 作为回退方案"""
@@ -427,23 +462,7 @@ class TextProcessor:
             cursor = end
 
         return spans
-    
-    @staticmethod
-    def create_sliding_windows(
-        text: str,
-        window_size: int = 500,
-        overlap: int = 100
-    ) -> List[Tuple[str, int]]:
-        """滑动窗口分块 - 用于长文本"""
-        words = text.split()
-        chunks = []
-        
-        for i in range(0, len(words), window_size - overlap):
-            chunk = ' '.join(words[i:i + window_size])
-            chunks.append((chunk, i))
-        
-        return chunks
-    
+
     @staticmethod
     def clean_text(text: str) -> str:
         """清理文本 - 保留各语言字符，避免破坏中文等非拉丁文本"""
@@ -453,14 +472,3 @@ class TextProcessor:
         text = re.sub(r"[ \t]+", " ", text)
         # 去除首尾空白
         return text.strip()
-
-
-# 全局实例
-_text_processor: Optional[TextProcessor] = None
-
-def get_text_processor() -> TextProcessor:
-    """获取文本处理器实例（单例模式）"""
-    global _text_processor
-    if _text_processor is None:
-        _text_processor = TextProcessor()
-    return _text_processor

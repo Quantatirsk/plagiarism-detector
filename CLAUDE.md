@@ -66,7 +66,7 @@ The system supports dual storage modes controlled by `MILVUS_MODE` environment v
 - **Local Mode** (`MILVUS_MODE=local`): Uses `MilvusClient("milvus_demo.db")` for development - no server required
 - **Server Mode** (`MILVUS_MODE=server`): Connects to production Milvus server
 
-Storage service automatically selects appropriate connection method based on mode in `app/services/storage.py`.
+Storage service automatically selects appropriate connection method based on mode in `app/services/vector_storage.py`.
 
 ### Service Architecture
 
@@ -143,7 +143,7 @@ rm milvus_demo.db  # Remove local Milvus database file
 ### Test Embedding Service
 
 ```python
-from app.services.embedding import EmbeddingService
+from app.services.embedding_service import EmbeddingService
 import asyncio
 
 async def test():

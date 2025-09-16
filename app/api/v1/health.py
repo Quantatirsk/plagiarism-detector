@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from app.services.health import HealthService
+from app.services.health_service import HealthService
 from app.api.deps import get_health_service
 from typing import Dict, Any
 import structlog

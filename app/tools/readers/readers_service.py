@@ -20,13 +20,12 @@ class ReadersService:
         # 使用集中的映射配置 - Linux 哲学：单一职责
         self._parser_map = get_parser_map()
 
-    def parse_document(self, file_path: str, **options) -> Optional[str]:
+    def parse_document(self, file_path: str) -> Optional[str]:
         """
         解析文档并返回文本内容
 
         Args:
             file_path: 文档文件路径
-            **options: 保留用于向后兼容，但不再使用
 
         Returns:
             解析的文本内容，失败返回None
@@ -95,9 +94,9 @@ def get_readers_service() -> ReadersService:
     return _readers_service
 
 # 便捷函数
-def parse_document(file_path: str, **options) -> Optional[str]:
+def parse_document(file_path: str) -> Optional[str]:
     """便捷函数：解析文档"""
-    return get_readers_service().parse_document(file_path, **options)
+    return get_readers_service().parse_document(file_path)
 
 def is_format_supported(file_path: str) -> bool:
     """便捷函数：检查格式是否支持"""

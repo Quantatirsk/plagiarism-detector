@@ -105,7 +105,6 @@ export const DualDocumentComparer: React.FC<DualDocumentComparerProps> = ({ clas
       document2.file,
       granularity,
       threshold,
-      undefined, // topKPerQuery no longer used in one-to-one matching
       maxTotalMatches
     );
   }, [document1.file, document2.file, granularity, threshold, maxTotalMatches, compareDocuments]);

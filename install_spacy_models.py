@@ -8,8 +8,8 @@ import sys
 def install_spacy_models():
     """安装中英文 spaCy 模型"""
     models = [
-        "zh_core_web_sm",  # 中文小模型
-        "en_core_web_sm",  # 英文小模型
+        "zh_core_web_md",  # 中文小模型
+        "en_core_web_md",  # 英文小模型
     ]
 
     for model in models:

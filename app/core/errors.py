@@ -238,10 +238,27 @@ class TextProcessingError(BaseApplicationError):
         details = {}
         if process_type:
             details["process_type"] = process_type
-        
+
         super().__init__(
             message=f"Text processing failed: {message}",
             error_code=ErrorCode.TEXT_PROCESSING_FAILED,
+            details=details,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+
+
+class DocumentParseError(BaseApplicationError):
+    """文档解析错误"""
+    def __init__(self, message: str, file_path: Optional[str] = None, file_type: Optional[str] = None):
+        details = {}
+        if file_path:
+            details["file_path"] = file_path
+        if file_type:
+            details["file_type"] = file_type
+
+        super().__init__(
+            message=f"Document parsing failed: {message}",
+            error_code=ErrorCode.TEXT_PROCESSING_FAILED,  # Reuse existing error code
             details=details,
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
         )
@@ -255,5 +272,4 @@ def create_http_exception(error: BaseApplicationError) -> HTTPException:
     )
 
 
-# 简单的别名 - 遵循Linus原则
-APIError = BaseApplicationError
+# 移除了不必要的别名 - 直接使用 BaseApplicationError

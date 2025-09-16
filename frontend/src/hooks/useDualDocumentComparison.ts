@@ -32,7 +32,6 @@ export interface DualDocumentComparisonHook {
     document2: File,
     granularity: Granularity,
     threshold?: number,
-    topKPerQuery?: number,
     maxTotalMatches?: number,
   ) => Promise<void>;
   reset: () => void;
@@ -163,7 +162,6 @@ export const useDualDocumentComparison = (): DualDocumentComparisonHook => {
     document2: File,
     granularity: Granularity = 'paragraph',
     threshold?: number,
-    topKPerQuery?: number,
     maxTotalMatches?: number,
   ) => {
     const validationError = validateFiles(document1, document2);
@@ -190,7 +188,6 @@ export const useDualDocumentComparison = (): DualDocumentComparisonHook => {
         document2,
         granularity,
         threshold,
-        top_k_per_query: topKPerQuery,
         max_total_matches: maxTotalMatches,
       };
 

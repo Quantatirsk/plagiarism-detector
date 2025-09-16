@@ -1,25 +1,22 @@
 """
 Milvus向量存储服务 - 支持本地和服务器两种模式
 """
-from typing import List, Dict, Any, Optional
-import numpy as np
-from app.core.config import get_settings, MilvusMode
+from typing import List, Dict, Any, Optional, Union
+from app.core.config import MilvusMode
 from app.core.errors import StorageError
-from app.core.logging import get_logger
-import uuid
-
-logger = get_logger(__name__)
-settings = get_settings()
+from app.services.base_service import BaseService, singleton
 
 
-class MilvusStorage:
+@singleton
+class MilvusStorage(BaseService):
     """Milvus向量存储 - 支持本地开发和生产模式"""
-    
-    def __init__(self):
-        self.collection_name = settings.milvus_collection
-        self.mode = settings.milvus_mode
-        self.client = None
-        self.collection = None
+
+    def _initialize(self):
+        """初始化Milvus连接"""
+        self.collection_name: str = self.settings.milvus_collection
+        self.mode: MilvusMode = self.settings.milvus_mode
+        self.client: Optional[Any] = None
+        self.collection: Optional[Any] = None
         self._connect()
     
     def _connect(self):
@@ -34,11 +31,11 @@ class MilvusStorage:
         from pymilvus import MilvusClient
         
         # 根据官方文档，直接传入文件名即可创建本地数据库
-        self.client = MilvusClient(settings.milvus_db_file)
-        logger.info("Connected to Milvus Lite", db_file=settings.milvus_db_file)
+        self.client = MilvusClient(self.settings.milvus_db_file)
+        self.logger.info("Connected to Milvus Lite", db_file=self.settings.milvus_db_file)
         
         # 确保集合存在
-        if not self.client.has_collection(self.collection_name):
+        if self.client and not self.client.has_collection(self.collection_name):
             self._create_collection_local()
     
     def _connect_server(self):
@@ -47,12 +44,12 @@ class MilvusStorage:
         
         connections.connect(
             alias="default",
-            host=settings.milvus_host,
-            port=settings.milvus_port
+            host=self.settings.milvus_host,
+            port=self.settings.milvus_port
         )
-        logger.info("Connected to Milvus server",
-                   host=settings.milvus_host,
-                   port=settings.milvus_port)
+        self.logger.info("Connected to Milvus server",
+                   host=self.settings.milvus_host,
+                   port=self.settings.milvus_port)
         
         # 确保集合存在
         if not utility.has_collection(self.collection_name):
@@ -64,13 +61,14 @@ class MilvusStorage:
     def _create_collection_local(self):
         """本地模式 - 创建集合"""
         # 根据官方文档，MilvusClient使用简化API
-        self.client.create_collection(
+        if self.client:
+            self.client.create_collection(
             collection_name=self.collection_name,
-            dimension=settings.openai_dimensions,
+            dimension=self.settings.openai_dimensions,
             metric_type="COSINE",  # 余弦相似度
             auto_id=True  # 让Milvus自动生成ID，我们用metadata存储自定义字段
         )
-        logger.info("Created local collection", name=self.collection_name, dimension=settings.openai_dimensions)
+        self.logger.info("Created local collection", name=self.collection_name, dimension=self.settings.openai_dimensions)
     
     def _create_collection_server(self):
         """生产模式 - 创建集合（原始方法）"""
@@ -80,7 +78,7 @@ class MilvusStorage:
             FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, max_length=100),
             FieldSchema(name="document_id", dtype=DataType.VARCHAR, max_length=100),
             FieldSchema(name="content", dtype=DataType.VARCHAR, max_length=50000),
-            FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=settings.openai_dimensions),
+            FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=self.settings.openai_dimensions),
             FieldSchema(name="chunk_type", dtype=DataType.VARCHAR, max_length=20),
             FieldSchema(name="position", dtype=DataType.INT64)
         ]
@@ -95,7 +93,7 @@ class MilvusStorage:
             "params": {"M": 16, "efConstruction": 200}
         }
         collection.create_index("embedding", index_params)
-        logger.info("Created server collection with index", name=self.collection_name)
+        self.logger.info("Created server collection with index", name=self.collection_name)
     
     async def insert_embeddings(
         self,
@@ -103,6 +101,7 @@ class MilvusStorage:
         embeddings: List[List[float]]
     ) -> int:
         """插入向量 - 支持两种模式"""
+        self._ensure_initialized()
         try:
             if self.mode == MilvusMode.LOCAL:
                 # 本地模式 - 使用MilvusClient的简化数据格式
@@ -117,12 +116,15 @@ class MilvusStorage:
                         "position": chunk.get("position", 0)
                     })
                 
-                res = self.client.insert(
+                if not self.client:
+                    raise StorageError("Milvus client not initialized", "insert")
+
+                self.client.insert(
                     collection_name=self.collection_name,
                     data=data
                 )
                 
-                logger.info("Inserted embeddings (local)", count=len(data))
+                self.logger.info("Inserted embeddings (local)", count=len(data))
                 return len(data)
             
             else:
@@ -136,14 +138,17 @@ class MilvusStorage:
                     "position": [chunk["position"] for chunk in chunks]
                 }
                 
+                if not self.collection:
+                    raise StorageError("Milvus collection not initialized", "insert")
+
                 result = self.collection.insert(data)
                 self.collection.flush()
                 
-                logger.info("Inserted embeddings (server)", count=len(chunks))
+                self.logger.info("Inserted embeddings (server)", count=len(chunks))
                 return result.insert_count
                 
         except Exception as e:
-            logger.error("Failed to insert embeddings", mode=self.mode, error=str(e))
+            self.logger.error("Failed to insert embeddings", mode=self.mode, error=str(e))
             raise StorageError(f"Insert failed: {e}", "insert")
     
     async def search_similar(
@@ -153,27 +158,31 @@ class MilvusStorage:
         filters: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """搜索相似向量 - 支持两种模式"""
+        self._ensure_initialized()
         try:
             if self.mode == MilvusMode.LOCAL:
                 # 本地模式 - 使用MilvusClient简化API
+                if not self.client:
+                    raise StorageError("Milvus client not initialized", "search")
+
                 results = self.client.search(
                     collection_name=self.collection_name,
                     data=[query_vector],
                     limit=top_k,
                     output_fields=["document_id", "content", "chunk_type", "position"],
-                    filter=filters if filters else None
+                    filter=filters
                 )
                 
                 matches = []
                 for result in results[0]:  # 结果是嵌套列表
                     # 调试：检查Milvus返回的distance值
                     cosine_distance = result.get("distance", 0.0)
-                    logger.info(f"Milvus LOCAL mode - Raw distance: {cosine_distance}")
+                    self.logger.info(f"Milvus LOCAL mode - Raw distance: {cosine_distance}")
 
                     # 修复：将余弦距离转换为余弦相似度
                     # 注意：确保相似度在合理范围内
                     cosine_similarity = 1.0 - cosine_distance
-                    logger.info(f"Converted similarity: {cosine_similarity}")
+                    self.logger.info(f"Converted similarity: {cosine_similarity}")
 
                     matches.append({
                         "id": result.get("id"),
@@ -193,6 +202,9 @@ class MilvusStorage:
                     "params": {"ef": max(64, top_k * 2)}
                 }
                 
+                if not self.collection:
+                    raise StorageError("Milvus collection not initialized", "search")
+
                 results = self.collection.search(
                     data=[query_vector],
                     anns_field="embedding",
@@ -204,7 +216,7 @@ class MilvusStorage:
                 
                 matches = []
                 for hits in results:
-                    for hit in hits:
+                    for hit in hits:  # type: ignore
                         # 修复：将余弦距离转换为余弦相似度
                         cosine_distance = hit.distance
                         cosine_similarity = 1.0 - cosine_distance
@@ -220,28 +232,19 @@ class MilvusStorage:
                 return matches
                 
         except Exception as e:
-            logger.error("Search failed", mode=self.mode, error=str(e))
+            self.logger.error("Search failed", mode=self.mode, error=str(e))
             raise StorageError(f"Search failed: {e}", "search")
     
     async def delete_collection(self):
         """删除集合 - 用于测试清理"""
+        self._ensure_initialized()
         try:
             if self.mode == MilvusMode.LOCAL:
-                self.client.drop_collection(self.collection_name)
+                if self.client:
+                    self.client.drop_collection(self.collection_name)
             else:
                 from pymilvus import utility
                 utility.drop_collection(self.collection_name)
-            logger.info("Dropped collection", name=self.collection_name)
+            self.logger.info("Dropped collection", name=self.collection_name)
         except Exception as e:
-            logger.error("Failed to drop collection", error=str(e))
-
-
-# 全局实例
-_storage_service = None
-
-def get_storage_service() -> MilvusStorage:
-    """获取存储服务实例"""
-    global _storage_service
-    if _storage_service is None:
-        _storage_service = MilvusStorage()
-    return _storage_service
+            self.logger.error("Failed to drop collection", error=str(e))

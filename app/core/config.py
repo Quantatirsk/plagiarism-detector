@@ -50,7 +50,6 @@ class Settings(BaseSettings):
     paragraph_similarity_threshold: float = Field(default=0.75, description="段落相似度阈值")
     sentence_similarity_threshold: float = Field(default=0.80, description="句子相似度阈值")
     top_k_paragraphs: int = Field(default=50, description="返回top-k个相似段落")
-    top_k_per_query: int = Field(default=50, description="每个查询块最多返回的匹配数量")
     max_total_matches: int = Field(default=2000, description="一次检测返回的最大匹配总数上限")
 
     # CORS 配置

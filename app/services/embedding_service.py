@@ -2,28 +2,25 @@
 嵌入服务 - OpenAI兼容的文本嵌入服务
 """
 import openai
-from typing import List, Optional
+from typing import List
 from tenacity import retry, stop_after_attempt, wait_exponential
-import asyncio
-from app.core.config import get_settings
 from app.core.errors import EmbeddingError
-from app.core.logging import get_logger
-
-logger = get_logger(__name__)
-settings = get_settings()
+from app.services.base_service import BaseService, singleton
 
 
-class EmbeddingService:
+@singleton
+class EmbeddingService(BaseService):
     """OpenAI嵌入服务 - 保持简单"""
-    
-    def __init__(self):
+
+    def _initialize(self):
+        """初始化OpenAI客户端"""
         self.client = openai.AsyncOpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url
+            api_key=self.settings.openai_api_key,
+            base_url=self.settings.openai_base_url
         )
-        self.model = settings.openai_model
-        self.dimensions = settings.openai_dimensions
-        self.batch_size = settings.openai_batch_size
+        self.model = self.settings.openai_model
+        self.dimensions = self.settings.openai_dimensions
+        self.batch_size = self.settings.openai_batch_size
     
     @retry(
         stop=stop_after_attempt(3),
@@ -31,9 +28,10 @@ class EmbeddingService:
     )
     async def embed_text(self, text: str) -> List[float]:
         """单文本嵌入"""
+        self._ensure_initialized()
         try:
-            logger.info(f"Starting embedding for text of length {len(text)} characters")
-            logger.info(f"Using model: {self.model}, API endpoint: {self.client.base_url}")
+            self.logger.info(f"Starting embedding for text of length {len(text)} characters")
+            self.logger.info(f"Using model: {self.model}, API endpoint: {self.client.base_url}")
 
             response = await self.client.embeddings.create(
                 input=text,
@@ -41,10 +39,10 @@ class EmbeddingService:
             )
 
             vector_dimension = len(response.data[0].embedding)
-            logger.info(f"Embedding completed successfully! Vector dimension: {vector_dimension}")
+            self.logger.info(f"Embedding completed successfully! Vector dimension: {vector_dimension}")
             return response.data[0].embedding
         except Exception as e:
-            logger.error("Embedding failed", text_length=len(text), error=str(e))
+            self.logger.error("Embedding failed", text_length=len(text), error=str(e))
             raise EmbeddingError(f"Failed to embed text: {e}")
     
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -56,23 +54,12 @@ class EmbeddingService:
             try:
                 return await self.embed_text(text)
             except Exception as e:
-                logger.error("Single embedding failed", text_length=len(text), error=str(e))
+                self.logger.error("Single embedding failed", text_length=len(text), error=str(e))
                 return [0.0] * self.dimensions
-        
+
         # 使用asyncio.gather并发处理所有文本
-        logger.info(f"Starting batch embedding for {len(texts)} texts")
+        self.logger.info(f"Starting batch embedding for {len(texts)} texts")
         embeddings = await asyncio.gather(*[embed_single_safe(text) for text in texts])
 
-        logger.info(f"Batch embedding completed: {len(embeddings)} embeddings generated (concurrent processing)")
+        self.logger.info(f"Batch embedding completed: {len(embeddings)} embeddings generated (concurrent processing)")
         return embeddings
-
-
-# 全局实例
-_embedding_service = None
-
-def get_embedding_service() -> EmbeddingService:
-    """获取嵌入服务实例"""
-    global _embedding_service
-    if _embedding_service is None:
-        _embedding_service = EmbeddingService()
-    return _embedding_service

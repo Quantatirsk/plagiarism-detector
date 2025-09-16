@@ -10,8 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 
-from app.services.dual_document_detection import get_dual_detection_service
-from app.services.document_parser import get_document_parser
+from app.services import service_factory
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -69,7 +68,6 @@ async def upload_and_compare_documents(
     document2: UploadFile = File(..., description="第二个文档文件"),
     granularity: str = Form("paragraph", description="检测粒度: paragraph/sentence"),
     threshold: float | None = Form(None, description="相似度阈值，可选"),
-    top_k_per_query: int | None = Form(None, description="每个查询块最多返回的匹配数量，仅段落模式生效，可选"),
     max_total_matches: int | None = Form(None, description="最大匹配总数上限，可选")
 ) -> Dict[str, Any]:
     """
@@ -92,8 +90,6 @@ async def upload_and_compare_documents(
             raise HTTPException(status_code=400, detail="Invalid granularity, must be 'paragraph' or 'sentence'")
         if threshold is not None and not (0.0 <= threshold <= 1.0):
             raise HTTPException(status_code=400, detail="Threshold must be between 0.0 and 1.0")
-        if top_k_per_query is not None and top_k_per_query <= 0:
-            raise HTTPException(status_code=400, detail="top_k_per_query must be positive")
         if max_total_matches is not None and max_total_matches <= 0:
             raise HTTPException(status_code=400, detail="max_total_matches must be positive")
 
@@ -105,13 +101,12 @@ async def upload_and_compare_documents(
 
         # 执行对比
         logger.info(f"Starting comparison with granularity={granularity}, threshold={threshold}")
-        detection_service = get_dual_detection_service()
+        detection_service = service_factory.get_dual_detection_service()
         result = await detection_service.compare_documents(
             doc1_path=doc1_path,
             doc2_path=doc2_path,
             granularity=granularity,
             threshold=threshold,
-            top_k_per_query=top_k_per_query,
             max_total_matches=max_total_matches
         )
 
@@ -151,7 +146,7 @@ async def check_document_format(
         # 保存到临时文件
         temp_path = await _save_upload_to_temp(document, "check")
         try:
-            doc_parser = get_document_parser()
+            doc_parser = service_factory.get_document_parser()
             doc_info = doc_parser.get_document_info(temp_path)
             return {
                 "filename": Path(document.filename or '').name,

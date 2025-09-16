@@ -11,7 +11,7 @@ import streamlit as st
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app.services.embedding import EmbeddingService
+from app.services import service_factory
 
 
 def cosine_similarity(v1, v2):
@@ -22,7 +22,7 @@ def cosine_similarity(v1, v2):
 
 # 初始化 session state
 if 'embedding_service' not in st.session_state:
-    st.session_state.embedding_service = EmbeddingService()
+    st.session_state.embedding_service = service_factory.get_embedding_service()
 
 if 'history' not in st.session_state:
     st.session_state.history = []
