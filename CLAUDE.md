@@ -32,7 +32,7 @@ cp .env.example .env
 
 ```bash
 # Development mode with auto-reload
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 # Access API documentation
 open http://localhost:8000/docs
@@ -100,8 +100,8 @@ Key environment variables in `.env`:
 
 - `OPENAI_API_KEY`: Required for embedding API access
 - `OPENAI_BASE_URL`: Custom endpoint (currently using vect.one)
-- `OPENAI_MODEL`: Embedding model (Qwen3-Embedding-8B)
-- `OPENAI_DIMENSIONS`: Vector dimensions (4096 for current model)
+- `EMBEDDING_MODEL`: Embedding model (Qwen3-Embedding-8B)
+- `EMBEDDING_DIMENSIONS`: Vector dimensions (4096 for current model)
 - `MILVUS_MODE`: Storage mode (local/server)
 
 ### Development Workflow
@@ -143,7 +143,7 @@ rm milvus_demo.db  # Remove local Milvus database file
 ### Test Embedding Service
 
 ```python
-from app.services.embedding_service import EmbeddingService
+from backend.services.embedding_service import EmbeddingService
 import asyncio
 
 async def test():

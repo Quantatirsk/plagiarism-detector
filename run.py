@@ -175,7 +175,7 @@ if __name__ == "__main__":
     try:
         # 启动服务器
         uvicorn.run(
-            "app.main:app",  # 使用字符串导入以支持 reload
+            "backend.main:app",  # 使用字符串导入以支持 reload
             host=host,
             port=port,
             reload=True,

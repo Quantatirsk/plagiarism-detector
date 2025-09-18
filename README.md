@@ -19,6 +19,7 @@
 ## 🚀 功能特性
 
 ### 核心功能
+
 - **🎯 智能文本分析**：使用先进的向量嵌入技术进行语义相似度检测
 - **📊 双粒度检测**：支持段落级（快速）和句子级（精确）两种检测模式
 - **🔍 实时悬停高亮**：鼠标悬停即可查看对应匹配内容，无需点击
@@ -27,6 +28,7 @@
 - **📈 相似度可视化**：四级颜色编码直观展示相似程度
 
 ### 前端特性
+
 - **📱 响应式设计**：支持桌面和移动设备
 - **⚡ 实时交互**：毫秒级响应的高亮联动
 - **📁 多格式支持**：PDF、DOCX、DOC、TXT、MD 等格式
@@ -34,6 +36,7 @@
 - **📊 统计面板**：实时显示匹配数量和平均相似度
 
 ### 后端特性
+
 - **🚄 高性能**：亚秒级响应时间（< 100ms）
 - **🗄️ 双存储模式**：开发环境本地文件存储，生产环境 Milvus 服务器
 - **🔧 灵活配置**：支持任何 OpenAI 兼容的嵌入模型
@@ -43,6 +46,7 @@
 ## 📦 技术栈
 
 ### 前端
+
 - **React 19.1** + **TypeScript 5.7** - 类型安全的现代前端框架
 - **Vite** - 极速的开发构建工具
 - **Tailwind CSS** - 实用优先的 CSS 框架
@@ -50,6 +54,7 @@
 - **React Markdown** - Markdown 渲染支持
 
 ### 后端
+
 - **FastAPI** - 高性能异步 Web 框架
 - **spaCy 3.7+** - 工业级自然语言处理
 - **Milvus 2.5+** - 向量数据库
@@ -68,12 +73,14 @@
 ### 安装步骤
 
 1. **克隆项目**
+
 ```bash
 git clone https://github.com/yourusername/plagiarism-detector.git
 cd plagiarism-detector
 ```
 
 2. **后端安装**
+
 ```bash
 # 创建虚拟环境
 python -m venv venv
@@ -87,40 +94,46 @@ python install_spacy_models.py
 ```
 
 3. **前端安装**
+
 ```bash
 cd frontend
 npm install
 ```
 
 4. **配置环境变量**
+
 ```bash
 cp .env.example .env
 # 编辑 .env 文件，配置以下参数：
 # - OPENAI_API_KEY: 你的 API 密钥
 # - OPENAI_BASE_URL: API 端点（如使用自定义服务）
-# - OPENAI_MODEL: 嵌入模型名称
+# - EMBEDDING_MODEL: 嵌入模型名称
 ```
 
 5. **启动服务**
 
 后端：
+
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 前端：
+
 ```bash
 cd frontend
 npm run dev
 ```
 
 6. **访问应用**
+
 - 前端界面：http://localhost:5173
 - API 文档：http://localhost:8000/docs
 
 ## 🏗️ 系统架构
 
 ### 整体架构
+
 ```
 ┌────────────────────────────────────────────┐
 │          React 前端 (TypeScript)            │
@@ -155,8 +168,7 @@ npm run dev
 4. **向量嵌入** → 调用 API 生成文本向量
 5. **相似度计算** → 余弦相似度矩阵计算
 6. **匹配算法**
-   - 句子级：匈牙利算法（一对一最优匹配）
-   - 段落级：贪心算法（一对一匹配）
+   - 贪心算法（一对一匹配）
 7. **结果展示** → 交互式高亮显示匹配结果
 
 ## 📋 使用指南
@@ -178,6 +190,7 @@ npm run dev
 ### API 使用
 
 #### 文档对比接口
+
 ```http
 POST /api/v1/comparison/upload-and-compare
 Content-Type: multipart/form-data
@@ -189,6 +202,7 @@ threshold: 0.6-1.0 (可选)
 ```
 
 响应示例：
+
 ```json
 {
   "task_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -217,8 +231,8 @@ threshold: 0.6-1.0 (可选)
 # API 配置
 OPENAI_API_KEY="your-api-key"
 OPENAI_BASE_URL="https://api.openai.com/v1"  # 可自定义
-OPENAI_MODEL="text-embedding-3-large"         # 嵌入模型
-OPENAI_DIMENSIONS=3072                         # 向量维度
+EMBEDDING_MODEL="text-embedding-3-large"         # 嵌入模型
+EMBEDDING_DIMENSIONS=3072                         # 向量维度
 
 # Milvus 配置
 MILVUS_MODE="local"                           # local 或 server
@@ -237,11 +251,12 @@ LOG_LEVEL="INFO"
 ### 存储模式说明
 
 - **本地模式**（开发环境）：
+
   - 设置 `MILVUS_MODE="local"`
   - 数据存储在本地文件 `milvus_demo.db`
   - 无需安装 Milvus 服务器
-
 - **服务器模式**（生产环境）：
+
   - 设置 `MILVUS_MODE="server"`
   - 配置 Milvus 服务器连接参数
   - 支持分布式部署和高并发
@@ -285,11 +300,13 @@ python test_chinese_sentence_split.py
 ### 匹配算法实现
 
 **句子级匹配（匈牙利算法）**：
+
 - 构建完整相似度矩阵
 - 全局最优一对一分配
 - 确保每个句子最多匹配一次
 
 **段落级匹配（贪心算法）**：
+
 - 按相似度降序排序
 - 贪心选择最优匹配对
 - 避免重复匹配
@@ -307,6 +324,7 @@ python test_chinese_sentence_split.py
 ## 📝 开发理念
 
 本项目秉承 Linus Torvalds 的开发哲学：
+
 > "Talk is cheap. Show me the code."
 
 - **简单性**：保持简洁，避免过度设计

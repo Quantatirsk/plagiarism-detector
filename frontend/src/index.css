@@ -103,7 +103,8 @@
     @apply border-border;
   }
 
-  html, body {
+  html,
+  body {
     margin: 0;
     padding: 0;
     width: 100%;
@@ -211,6 +212,21 @@
     scroll-behavior: auto !important;
     transition: none !important;
     animation: none !important;
+  }
+
+  /* Reset mark element styling to prevent text spacing issues */
+  mark {
+    padding: 0;
+    margin: 0;
+    line-height: inherit;
+    vertical-align: baseline;
+  }
+
+  /* Active match highlight */
+  mark.active-match {
+    box-shadow: 0 0 0 1px rgb(59 130 246);
+    position: relative;
+    z-index: 1;
   }
 }
 
