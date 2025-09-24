@@ -60,10 +60,10 @@ export function DocumentLibraryPage({ onNavigateJobs }: DocumentLibraryPageProps
         subtitle="上传文档、查看处理进度，并为后续比对做准备。"
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onNavigateJobs}>
+            <Button variant="outline" size="sm" className="hover:bg-primary/10 hover:text-primary hover:border-primary" onClick={onNavigateJobs}>
               前往比对任务
             </Button>
-            <Button asChild size="sm" disabled={uploading}>
+            <Button asChild variant="default" size="sm" disabled={uploading}>
               <label className="cursor-pointer">
                 {uploading ? '正在上传…' : '上传文档'}
                 <input type="file" multiple className="sr-only" onChange={handleUpload} />
@@ -82,7 +82,7 @@ export function DocumentLibraryPage({ onNavigateJobs }: DocumentLibraryPageProps
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {loading && <span>加载中…</span>}
-              <Button variant="ghost" size="sm" onClick={reload} disabled={loading}>
+              <Button variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary" onClick={reload} disabled={loading}>
                 刷新列表
               </Button>
             </div>

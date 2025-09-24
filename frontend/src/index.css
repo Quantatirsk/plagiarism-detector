@@ -544,3 +544,14 @@
     box-shadow: 0 0 0 rgba(59, 130, 246, 0);
   }
 }
+
+
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

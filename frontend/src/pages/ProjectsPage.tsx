@@ -56,7 +56,7 @@ export function ProjectsPage({ onSelectProject }: ProjectsPageProps) {
         subtitle="按照项目组织文件上传与比对，便于生成综合报告。"
         meta={loading ? '加载中…' : `项目数：${projectCount}`}
         actions={
-          <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
+          <Button variant="outline" size="sm" className="hover:bg-primary/10 hover:text-primary hover:border-primary" onClick={reload} disabled={loading}>
             刷新列表
           </Button>
         }
@@ -94,10 +94,10 @@ export function ProjectsPage({ onSelectProject }: ProjectsPageProps) {
                 />
               </div>
               <div className="flex items-center gap-3 md:col-span-2">
-                <Button type="submit" disabled={creating}>
+                <Button type="submit" variant="default" disabled={creating}>
                   {creating ? '正在创建…' : '创建项目'}
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => {
+                <Button type="button" variant="ghost" className="hover:bg-primary/10 hover:text-primary" onClick={() => {
                   setName('');
                   setDescription('');
                 }}

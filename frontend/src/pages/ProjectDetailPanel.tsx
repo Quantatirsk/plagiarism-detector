@@ -129,7 +129,7 @@ export function ProjectDetailPanel({ project, onBack, onOpenJob }: ProjectDetail
             <Button
               variant="ghost"
               size="sm"
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="text-xs hover:text-primary hover:bg-primary/10"
               onClick={onBack}
             >
               ← 返回列表
@@ -152,6 +152,7 @@ export function ProjectDetailPanel({ project, onBack, onOpenJob }: ProjectDetail
             <Button
               variant="outline"
               size="sm"
+              className="hover:bg-primary/10 hover:text-primary hover:border-primary"
               onClick={() => {
                 documentState.reload();
                 jobsState.reload();
@@ -163,6 +164,7 @@ export function ProjectDetailPanel({ project, onBack, onOpenJob }: ProjectDetail
             <div className="flex items-center gap-2">
               {comparisonProgress.task && <ProgressIndicator task={comparisonProgress.task} />}
               <Button
+                variant="default"
                 size="sm"
                 onClick={handleRunComparisons}
                 disabled={runningComparisons || projectStats.totalDocs < 2}
@@ -265,7 +267,7 @@ export function ProjectDetailPanel({ project, onBack, onOpenJob }: ProjectDetail
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               {hasActiveJobs && <span className="inline-flex h-6 items-center rounded-full bg-primary/10 px-2 text-primary">自动刷新中…</span>}
               {jobsState.loading && <span>加载中…</span>}
-              <Button variant="ghost" size="sm" disabled={jobsState.loading} onClick={jobsState.reload}>
+              <Button variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary" disabled={jobsState.loading} onClick={jobsState.reload}>
                 刷新
               </Button>
             </div>
@@ -300,7 +302,7 @@ export function ProjectDetailPanel({ project, onBack, onOpenJob }: ProjectDetail
                           {job.updated_at ? new Date(job.updated_at).toLocaleString() : '—'}
                         </td>
                         <td className="px-5 py-3 text-right text-xs">
-                          <Button variant="outline" size="sm" onClick={() => onOpenJob(job)}>
+                          <Button variant="outline" size="sm" className="hover:bg-primary/10 hover:text-primary hover:border-primary" onClick={() => onOpenJob(job)}>
                             查看任务
                           </Button>
                         </td>

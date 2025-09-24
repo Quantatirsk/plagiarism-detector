@@ -167,10 +167,10 @@ export function CompareJobsPage({ onNavigateDocuments, onOpenPair }: CompareJobs
         }
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onNavigateDocuments}>
+            <Button variant="outline" size="sm" className="hover:bg-primary/10 hover:text-primary hover:border-primary" onClick={onNavigateDocuments}>
               返回文档库
             </Button>
-            <Button size="sm" onClick={handleCreateJob} disabled={creatingJob}>
+            <Button variant="default" size="sm" onClick={handleCreateJob} disabled={creatingJob}>
               {creatingJob ? '正在创建…' : '新建任务'}
             </Button>
           </div>
@@ -269,7 +269,7 @@ export function CompareJobsPage({ onNavigateDocuments, onOpenPair }: CompareJobs
                     </div>
                     <div className="flex flex-col items-end gap-2 text-right text-xs text-muted-foreground sm:text-sm">
                       <span>配对数量：{pairs?.length ?? 0}</span>
-                      <Button variant="outline" size="sm" onClick={reloadPairs} disabled={pairsLoading}>
+                      <Button variant="outline" size="sm" className="hover:bg-primary/10 hover:text-primary hover:border-primary" onClick={reloadPairs} disabled={pairsLoading}>
                         刷新配对
                       </Button>
                     </div>
@@ -352,6 +352,7 @@ export function CompareJobsPage({ onNavigateDocuments, onOpenPair }: CompareJobs
                           type="button"
                           variant="ghost"
                           size="sm"
+                          className="hover:bg-primary/10 hover:text-primary"
                           onClick={() => {
                             setLeftDocumentId('');
                             setRightDocumentId('');
@@ -375,7 +376,7 @@ export function CompareJobsPage({ onNavigateDocuments, onOpenPair }: CompareJobs
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       {pairsLoading && <span>加载中…</span>}
-                      <Button variant="ghost" size="sm" onClick={reloadPairs} disabled={pairsLoading}>
+                      <Button variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary" onClick={reloadPairs} disabled={pairsLoading}>
                         刷新
                       </Button>
                     </div>

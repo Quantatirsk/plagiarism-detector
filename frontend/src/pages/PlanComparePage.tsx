@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MatchInfoTooltip } from '@/components/ui/match-info-popover';
 import { cn } from '@/lib/utils';
 import { buildSegmentsWithOverlap, type HighlightInterval as ImportedHighlightInterval } from '@/utils/highlightUtilsSimple';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 type Side = 'left' | 'right';
 type DocumentLookup = Record<number, DocumentSummary>;
@@ -95,6 +96,7 @@ export function PlanComparePage({
   );
 
   const [activeKey, setActiveKey] = useState<string | null>(matches[0]?.key ?? null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const leftIntervals = useMemo(() => prepareIntervals(leftDocument?.processed_text ?? '', matches, 'left'), [leftDocument?.processed_text, matches]);
   const rightIntervals = useMemo(() => prepareIntervals(rightDocument?.processed_text ?? '', matches, 'right'), [rightDocument?.processed_text, matches]);
@@ -200,39 +202,55 @@ export function PlanComparePage({
     <PageShell>
       <PageHeader
         title={
-          <div className="flex items-center gap-3">
+          <>
             <Button
               variant="ghost"
               size="sm"
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="text-xs hover:text-primary hover:bg-primary/10"
               onClick={onBack}
             >
               ← 返回任务
             </Button>
-            <span>
-              {formatDocumentLabel(report.pair.left_document_id, documentLookup, leftDocument)} ↔{' '}
-              {formatDocumentLabel(report.pair.right_document_id, documentLookup, rightDocument)}
-            </span>
+            <div className="border-l border-border pl-3">
+              <div className="text-sm font-medium">
+                {formatDocumentLabel(report.pair.left_document_id, documentLookup, leftDocument)} ↔{' '}
+                {formatDocumentLabel(report.pair.right_document_id, documentLookup, rightDocument)}
+              </div>
+              <div className="text-xs text-muted-foreground">匹配数量：{matches.length}</div>
+            </div>
+          </>
+        }
+        actions={
+          <div className="flex items-center gap-3">
+            <PairSwitcher
+              pairs={pairOptions}
+              currentPair={currentPair}
+              loading={pairsLoading}
+              error={pairsError}
+              documentLookup={documentLookup}
+              currentLeftDocument={leftDocument}
+              currentRightDocument={rightDocument}
+              onSwitchPair={onSwitchPair}
+              onReloadPairs={onReloadPairs}
+            />
+            <div className="h-7 w-px bg-border" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 p-0 hover:bg-primary/10 hover:text-primary hover:border-primary"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              title={sidebarCollapsed ? '展开匹配列表' : '折叠匹配列表'}
+            >
+              {sidebarCollapsed ? (
+                <ChevronLeft className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+              <span className="sr-only">{sidebarCollapsed ? '展开' : '折叠'}侧边栏</span>
+            </Button>
           </div>
         }
-        subtitle={`匹配数量：${matches.length}`}
       />
-
-      <div className="border-b border-border bg-background px-6 py-3">
-        <PairSwitcher
-          pairs={pairOptions}
-          currentPair={currentPair}
-          loading={pairsLoading}
-          documentLookup={documentLookup}
-          currentLeftDocument={leftDocument}
-          currentRightDocument={rightDocument}
-          onSwitchPair={onSwitchPair}
-          onReloadPairs={onReloadPairs}
-        />
-        {pairsError && (
-          <div className="mt-2 text-xs text-destructive">刷新配对列表失败：{pairsError}</div>
-        )}
-      </div>
 
       <div className="relative flex flex-1 min-h-0 divide-x divide-border bg-background">
         {isTransitioning && (
@@ -240,47 +258,6 @@ export function PlanComparePage({
             <div className="animate-pulse text-sm text-muted-foreground">正在切换文档...</div>
           </div>
         )}
-          <aside className="flex flex-col w-72 min-w-[18rem] border-r border-border bg-card shadow-sm">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3 flex-shrink-0">
-              <h2 className="text-sm font-medium text-muted-foreground">匹配列表</h2>
-              <span className="text-xs text-muted-foreground">{matches.length}</span>
-            </div>
-            <div className="flex-1 min-h-0 overflow-auto">
-            {matches.length === 0 ? (
-              <p className="px-4 py-4 text-sm text-muted-foreground">未发现匹配结果。</p>
-            ) : (
-              <ul className="divide-y divide-border/60">
-                {matches.map((match, index) => {
-                  const { group } = match;
-                  const isActive = match.key === activeKey;
-                  return (
-                    <li key={match.key}>
-                      <button
-                        onClick={() => handleSelectMatch(match.key, 'left')}
-                        className={cn(
-                          'flex w-full flex-col gap-1 px-4 py-3 text-left text-sm transition',
-                          isActive ? 'font-medium ring-1 ring-primary/30 bg-accent' : 'hover:bg-accent/50',
-                          'hover:bg-accent'
-                        )}
-                        data-match-key={match.key}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-muted-foreground">#{index + 1}</span>
-                          <span className={cn("text-xs font-mono", getScoreColorClasses(group.final_score))}>{formatScore(group.final_score)}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                          <span>语义 {formatScore(group.semantic_score)}</span>
-                          <span>交叉编码 {formatScore(group.cross_score)}</span>
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        </aside>
-
         <main className="flex-1 min-h-0 overflow-hidden">
           <div className="relative flex h-full min-h-0 flex-col gap-5 p-6">
             <div className="grid flex-1 min-h-0 grid-cols-1 gap-5 xl:grid-cols-2">
@@ -304,6 +281,58 @@ export function PlanComparePage({
 
           </div>
         </main>
+        <aside className={cn(
+          "flex flex-col border-l border-border bg-card shadow-sm transition-all duration-300 relative",
+          sidebarCollapsed ? "w-0 overflow-hidden" : "w-72 min-w-[18rem]"
+        )}>
+            <div className={cn(
+              "flex items-center justify-between border-b border-border px-4 py-3 flex-shrink-0",
+              sidebarCollapsed && "px-0 justify-center"
+            )}>
+              {!sidebarCollapsed && (
+                <>
+                  <h2 className="text-sm font-medium text-muted-foreground">匹配列表</h2>
+                  <span className="text-xs text-muted-foreground">{matches.length}</span>
+                </>
+              )}
+            </div>
+            {!sidebarCollapsed && (
+              <div className="flex-1 min-h-0 overflow-auto">
+                {matches.length === 0 ? (
+                  <p className="px-4 py-4 text-sm text-muted-foreground">未发现匹配结果。</p>
+                ) : (
+                  <ul className="divide-y divide-border/60">
+                    {matches.map((match, index) => {
+                      const { group } = match;
+                      const isActive = match.key === activeKey;
+                      return (
+                        <li key={match.key}>
+                          <button
+                            onClick={() => handleSelectMatch(match.key, 'left')}
+                            className={cn(
+                              'flex w-full flex-col gap-1 px-4 py-3 text-left text-sm transition',
+                              isActive ? 'font-medium ring-1 ring-primary/30 bg-accent' : 'hover:bg-accent/50',
+                              'hover:bg-accent'
+                            )}
+                            data-match-key={match.key}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-muted-foreground">#{index + 1}</span>
+                              <span className={cn("text-xs font-mono", getScoreColorClasses(group.final_score))}>{formatScore(group.final_score)}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                              <span>语义 {formatScore(group.semantic_score)}</span>
+                              <span>交叉编码 {formatScore(group.cross_score)}</span>
+                            </div>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
+        </aside>
       </div>
     </PageShell>
   );
@@ -337,6 +366,7 @@ interface PairSwitcherProps {
   pairs: ComparePairSummary[];
   currentPair: ComparePairSummary;
   loading: boolean;
+  error: string | null;
   documentLookup: DocumentLookup;
   currentLeftDocument: DocumentDetail | null;
   currentRightDocument: DocumentDetail | null;
@@ -348,6 +378,7 @@ function PairSwitcher({
   pairs,
   currentPair,
   loading,
+  error,
   documentLookup,
   currentLeftDocument,
   currentRightDocument,
@@ -435,21 +466,24 @@ function PairSwitcher({
   };
 
   return (
-    <div className="flex items-center gap-4 text-xs text-muted-foreground sm:text-sm">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">左侧文档</span>
+    <div className="flex items-center gap-3">
+      {error && (
+        <span className="text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded">{error}</span>
+      )}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">左侧:</span>
           <Select
             value={String(leftSelection)}
             onValueChange={handleLeftChange}
             disabled={disableLeftSelect || loading}
           >
-            <SelectTrigger className="h-8 w-[200px] px-3 text-sm">
+            <SelectTrigger className="h-7 w-[120px] px-2 text-xs hover:border-primary focus:border-primary">
               <SelectValue />
             </SelectTrigger>
             <SelectContent align="start" className="max-h-64">
               {uniqueLefts.map((left) => (
-                <SelectItem key={left} value={String(left)} className="text-sm">
+                <SelectItem key={left} value={String(left)} className="text-xs">
                   <span className="block truncate">
                     {formatDocumentLabel(
                       left,
@@ -462,19 +496,19 @@ function PairSwitcher({
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">右侧文档</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">右侧:</span>
           <Select
             value={String(rightSelection)}
             onValueChange={handleRightChange}
             disabled={disableRightSelect || loading}
           >
-            <SelectTrigger className="h-8 w-[200px] px-3 text-sm">
+            <SelectTrigger className="h-7 w-[120px] px-2 text-xs hover:border-primary focus:border-primary">
               <SelectValue />
             </SelectTrigger>
             <SelectContent align="start" className="max-h-64">
               {pairsForLeft.map((pair) => (
-                <SelectItem key={pair.id} value={String(pair.id)} className="text-sm">
+                <SelectItem key={pair.id} value={String(pair.id)} className="text-xs">
                   <span className="block truncate">
                     {formatDocumentLabel(
                       pair.right_document_id,
@@ -488,17 +522,43 @@ function PairSwitcher({
           </Select>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" className="h-8" onClick={handlePrev} disabled={!canPrev || loading}>
-          上一个
+      <div className="h-5 w-px bg-border" />
+      <div className="flex items-center gap-1">
+        <Button
+          variant="default"
+          size="sm"
+          className="h-7 w-7 p-0"
+          onClick={handlePrev}
+          disabled={!canPrev || loading}
+          title="上一个配对"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+          <span className="sr-only">上一个</span>
         </Button>
-        <Button variant="outline" size="sm" className="h-8" onClick={handleNext} disabled={!canNext || loading}>
-          下一个
+        <Button
+          variant="default"
+          size="sm"
+          className="h-7 w-7 p-0"
+          onClick={handleNext}
+          disabled={!canNext || loading}
+          title="下一个配对"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+          <span className="sr-only">下一个</span>
         </Button>
-        <Button variant="outline" size="sm" className="h-8" onClick={onReloadPairs} disabled={loading}>
-          刷新
+        <Button
+          variant="default"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={onReloadPairs}
+          disabled={loading}
+        >
+          {loading ? (
+            <span className="animate-pulse">刷新中...</span>
+          ) : (
+            '刷新'
+          )}
         </Button>
-        {loading && <span className="text-xs">刷新中…</span>}
       </div>
     </div>
   );

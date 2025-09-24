@@ -49,7 +49,7 @@ export function ProjectJobPanel({
             <Button
               variant="ghost"
               size="sm"
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="text-xs hover:text-primary hover:bg-primary/10"
               onClick={onBack}
             >
               ← 返回项目
@@ -60,7 +60,7 @@ export function ProjectJobPanel({
         subtitle={`所属项目：${project.name || `项目 #${project.id}`}`}
         meta={<StatusBadge tone={jobStatusMeta.tone}>{jobStatusMeta.label}</StatusBadge>}
         actions={
-          <Button variant="outline" size="sm" disabled={pairsLoading} onClick={onReloadPairs}>
+          <Button variant="outline" size="sm" className="hover:bg-primary/10 hover:text-primary hover:border-primary" disabled={pairsLoading} onClick={onReloadPairs}>
             刷新结果
           </Button>
         }
@@ -80,7 +80,7 @@ export function ProjectJobPanel({
               {hasActivePairs && !pairsLoading && (
                 <span className="inline-flex h-6 items-center rounded-full bg-primary/10 px-2 text-primary">自动刷新中…</span>
               )}
-              <Button variant="ghost" size="sm" disabled={pairsLoading} onClick={onReloadPairs}>
+              <Button variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary" disabled={pairsLoading} onClick={onReloadPairs}>
                 手动刷新
               </Button>
             </div>
@@ -118,7 +118,9 @@ export function ProjectJobPanel({
                         <td className="px-5 py-3 text-xs text-muted-foreground">{formatTopScore(pair.metrics)}</td>
                         <td className="px-5 py-3 text-right text-xs">
                           <Button
+                            variant={pair.status === 'completed' ? 'default' : 'outline'}
                             size="sm"
+                            className={pair.status === 'completed' ? '' : 'hover:bg-primary/10 hover:text-primary hover:border-primary'}
                             onClick={() => onOpenPair(pair)}
                             disabled={pair.status !== 'completed'}
                           >
