@@ -167,7 +167,7 @@ export function CompareJobsPage({ onNavigateDocuments, onOpenPair }: CompareJobs
         }
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="hover:bg-primary/10 hover:text-primary hover:border-primary" onClick={onNavigateDocuments}>
+            <Button variant="default" size="sm" onClick={onNavigateDocuments}>
               返回文档库
             </Button>
             <Button variant="default" size="sm" onClick={handleCreateJob} disabled={creatingJob}>
@@ -177,8 +177,8 @@ export function CompareJobsPage({ onNavigateDocuments, onOpenPair }: CompareJobs
         }
       />
 
-      <PageContent containerClassName="gap-6">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <PageContent className="flex" containerClassName="flex-1 min-h-0">
+        <div className="grid flex-1 min-h-0 gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
           <SectionCard padding="none" className="lg:sticky lg:top-24 lg:h-fit">
             <div className="flex items-center justify-between border-b border-border px-5 py-3">
               <div className="text-sm font-medium text-muted-foreground">

@@ -97,7 +97,7 @@ interface PageContentProps {
 export function PageContent({ children, className, containerClassName }: PageContentProps) {
   return (
     <main className={cn('flex-1 overflow-auto min-h-0', className)}>
-      <div className={cn('mx-auto flex max-w-6xl flex-col gap-6 px-6 py-6', containerClassName)}>{children}</div>
+      <div className={cn('flex flex-col gap-6 px-6 py-6', containerClassName)}>{children}</div>
     </main>
   );
 }

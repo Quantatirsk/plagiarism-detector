@@ -204,9 +204,9 @@ export function PlanComparePage({
         title={
           <>
             <Button
-              variant="ghost"
+              variant="default"
               size="sm"
-              className="text-xs hover:text-primary hover:bg-primary/10"
+              className="text-xs"
               onClick={onBack}
             >
               ← 返回任务
@@ -233,18 +233,18 @@ export function PlanComparePage({
               onSwitchPair={onSwitchPair}
               onReloadPairs={onReloadPairs}
             />
-            <div className="h-7 w-px bg-border" />
+            <div className="h-9 w-px bg-border" />
             <Button
               variant="outline"
               size="sm"
-              className="h-7 w-7 p-0 hover:bg-primary/10 hover:text-primary hover:border-primary"
+              className="hover:bg-primary/10 hover:text-primary hover:border-primary"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               title={sidebarCollapsed ? '展开匹配列表' : '折叠匹配列表'}
             >
               {sidebarCollapsed ? (
-                <ChevronLeft className="h-3.5 w-3.5" />
+                <ChevronLeft className="h-4 w-4" />
               ) : (
-                <ChevronRight className="h-3.5 w-3.5" />
+                <ChevronRight className="h-4 w-4" />
               )}
               <span className="sr-only">{sidebarCollapsed ? '展开' : '折叠'}侧边栏</span>
             </Button>
@@ -468,22 +468,22 @@ function PairSwitcher({
   return (
     <div className="flex items-center gap-3">
       {error && (
-        <span className="text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded">{error}</span>
+        <span className="text-sm text-destructive bg-destructive/10 px-2 py-1 rounded">{error}</span>
       )}
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">左侧:</span>
+          <span className="text-sm text-muted-foreground">左侧:</span>
           <Select
             value={String(leftSelection)}
             onValueChange={handleLeftChange}
             disabled={disableLeftSelect || loading}
           >
-            <SelectTrigger className="h-7 w-[120px] px-2 text-xs hover:border-primary focus:border-primary">
+            <SelectTrigger className="h-9 w-[140px] px-3 text-sm hover:border-primary focus:border-primary">
               <SelectValue />
             </SelectTrigger>
             <SelectContent align="start" className="max-h-64">
               {uniqueLefts.map((left) => (
-                <SelectItem key={left} value={String(left)} className="text-xs">
+                <SelectItem key={left} value={String(left)} className="text-sm">
                   <span className="block truncate">
                     {formatDocumentLabel(
                       left,
@@ -497,18 +497,18 @@ function PairSwitcher({
           </Select>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">右侧:</span>
+          <span className="text-sm text-muted-foreground">右侧:</span>
           <Select
             value={String(rightSelection)}
             onValueChange={handleRightChange}
             disabled={disableRightSelect || loading}
           >
-            <SelectTrigger className="h-7 w-[120px] px-2 text-xs hover:border-primary focus:border-primary">
+            <SelectTrigger className="h-9 w-[140px] px-3 text-sm hover:border-primary focus:border-primary">
               <SelectValue />
             </SelectTrigger>
             <SelectContent align="start" className="max-h-64">
               {pairsForLeft.map((pair) => (
-                <SelectItem key={pair.id} value={String(pair.id)} className="text-xs">
+                <SelectItem key={pair.id} value={String(pair.id)} className="text-sm">
                   <span className="block truncate">
                     {formatDocumentLabel(
                       pair.right_document_id,
@@ -522,34 +522,31 @@ function PairSwitcher({
           </Select>
         </div>
       </div>
-      <div className="h-5 w-px bg-border" />
+      <div className="h-9 w-px bg-border" />
       <div className="flex items-center gap-1">
         <Button
           variant="default"
           size="sm"
-          className="h-7 w-7 p-0"
           onClick={handlePrev}
           disabled={!canPrev || loading}
           title="上一个配对"
         >
-          <ChevronLeft className="h-3.5 w-3.5" />
+          <ChevronLeft className="h-4 w-4" />
           <span className="sr-only">上一个</span>
         </Button>
         <Button
           variant="default"
           size="sm"
-          className="h-7 w-7 p-0"
           onClick={handleNext}
           disabled={!canNext || loading}
           title="下一个配对"
         >
-          <ChevronRight className="h-3.5 w-3.5" />
+          <ChevronRight className="h-4 w-4" />
           <span className="sr-only">下一个</span>
         </Button>
         <Button
           variant="default"
           size="sm"
-          className="h-7 px-2 text-xs"
           onClick={onReloadPairs}
           disabled={loading}
         >

@@ -47,9 +47,9 @@ export function ProjectJobPanel({
         title={
           <div className="flex items-center gap-3">
             <Button
-              variant="ghost"
+              variant="default"
               size="sm"
-              className="text-xs hover:text-primary hover:bg-primary/10"
+              className="text-xs"
               onClick={onBack}
             >
               ← 返回项目
