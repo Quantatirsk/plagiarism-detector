@@ -9,15 +9,15 @@ from fastapi import Depends
 
 def get_embedding_service() -> EmbeddingService:
     """获取嵌入服务单例"""
-    return service_factory.get_embedding_service()
+    return ServiceFactory.get_embedding_service()
 
 def get_storage_service() -> MilvusStorage:
     """获取存储服务单例"""
-    return service_factory.get_storage_service()
+    return ServiceFactory.get_storage_service()
 
 def get_text_processor() -> TextProcessor:
     """获取文本处理器单例"""
-    return service_factory.get_text_processor()
+    return ServiceFactory.get_text_processor()
 
 @lru_cache()
 def get_cache_service() -> RedisCache:

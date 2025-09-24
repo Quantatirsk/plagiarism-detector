@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { DOCUMENT_STATUS_META, JOB_STATUS_META, fallbackStatusMeta } from '@/lib/status';
 import { TABLE_BASE, TABLE_BODY, TABLE_HEAD } from '@/lib/table';
+import { useProgressTracking } from '@/hooks/useProgressTracking';
+import { ProgressIndicator } from '@/components/progress/ProgressIndicator';
 
 interface ProjectDetailPanelProps {
   project: ProjectSummary;
@@ -17,9 +19,41 @@ interface ProjectDetailPanelProps {
 
 export function ProjectDetailPanel({ project, onBack, onOpenJob }: ProjectDetailPanelProps) {
   const [uploading, setUploading] = useState(false);
+  const [uploadTaskId, setUploadTaskId] = useState<string | null>(null);
+  const [comparisonTaskId, setComparisonTaskId] = useState<string | null>(null);
   const documentState = useDocuments({ projectId: project.id });
   const jobsState = useCompareJobs(project.id);
   const [runningComparisons, setRunningComparisons] = useState(false);
+
+  // Progress tracking for uploads
+  const uploadProgress = useProgressTracking(uploadTaskId, {
+    useSSE: true,
+    onComplete: () => {
+      setUploadTaskId(null);
+      setUploading(false);
+      documentState.reload();
+    },
+    onError: () => {
+      setUploadTaskId(null);
+      setUploading(false);
+      alert('文件上传失败，请查看详情');
+    },
+  });
+
+  // Progress tracking for comparisons
+  const comparisonProgress = useProgressTracking(comparisonTaskId, {
+    useSSE: true,
+    onComplete: () => {
+      setComparisonTaskId(null);
+      setRunningComparisons(false);
+      jobsState.reload();
+    },
+    onError: () => {
+      setComparisonTaskId(null);
+      setRunningComparisons(false);
+      alert('比对任务失败，请查看详情');
+    },
+  });
 
   const documents = documentState.data ?? [];
   const jobs = jobsState.data ?? [];
@@ -47,14 +81,15 @@ export function ProjectDetailPanel({ project, onBack, onOpenJob }: ProjectDetail
     }
     setUploading(true);
     try {
-      await plagiarismApi.uploadDocuments(project.id, Array.from(event.target.files));
+      const response = await plagiarismApi.uploadDocuments(project.id, Array.from(event.target.files));
+      setUploadTaskId(response.task_id);
+      // Placeholder documents are already created
       documentState.reload();
-      jobsState.reload();
     } catch (error) {
       console.error(error);
       alert((error as Error).message || '上传失败');
-    } finally {
       setUploading(false);
+    } finally {
       event.target.value = '';
     }
   };
@@ -62,12 +97,11 @@ export function ProjectDetailPanel({ project, onBack, onOpenJob }: ProjectDetail
   const handleRunComparisons = async () => {
     setRunningComparisons(true);
     try {
-      await plagiarismApi.runProjectComparisons(project.id);
-      jobsState.reload();
+      const response = await plagiarismApi.runProjectComparisons(project.id);
+      setComparisonTaskId(response.task_id);
     } catch (error) {
       console.error(error);
       alert((error as Error).message || '运行比对失败');
-    } finally {
       setRunningComparisons(false);
     }
   };
@@ -126,13 +160,16 @@ export function ProjectDetailPanel({ project, onBack, onOpenJob }: ProjectDetail
             >
               刷新数据
             </Button>
-            <Button
-              size="sm"
-              onClick={handleRunComparisons}
-              disabled={runningComparisons || projectStats.totalDocs < 2}
-            >
-              {runningComparisons ? '正在执行…' : '运行比对'}
-            </Button>
+            <div className="flex items-center gap-2">
+              {comparisonProgress.task && <ProgressIndicator task={comparisonProgress.task} />}
+              <Button
+                size="sm"
+                onClick={handleRunComparisons}
+                disabled={runningComparisons || projectStats.totalDocs < 2}
+              >
+                {runningComparisons ? '正在执行…' : '运行比对'}
+              </Button>
+            </div>
           </div>
         }
       />
@@ -166,6 +203,7 @@ export function ProjectDetailPanel({ project, onBack, onOpenJob }: ProjectDetail
                 {uploading ? '正在上传…' : '点击或拖拽选择文件'}
               </span>
               <span className="text-xs text-muted-foreground">支持多选，上传后会自动开始处理</span>
+              {uploadProgress.task && <ProgressIndicator task={uploadProgress.task} />}
               <input type="file" multiple className="sr-only" onChange={handleUpload} disabled={uploading} />
             </label>
           </div>
@@ -275,6 +313,7 @@ export function ProjectDetailPanel({ project, onBack, onOpenJob }: ProjectDetail
           </div>
         </SectionCard>
       </PageContent>
+
     </PageShell>
   );
 }

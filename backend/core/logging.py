@@ -253,14 +253,19 @@ class LogEvent:
     DETECTION_STARTED = "detection_started"
     DETECTION_COMPLETED = "detection_completed"
     DETECTION_FAILED = "detection_failed"
-    
+
     EMBEDDING_STARTED = "embedding_started"
     EMBEDDING_COMPLETED = "embedding_completed"
     EMBEDDING_FAILED = "embedding_failed"
-    
+
     TEXT_PROCESSING_STARTED = "text_processing_started"
     TEXT_PROCESSING_COMPLETED = "text_processing_completed"
     TEXT_PROCESSING_FAILED = "text_processing_failed"
+
+    # Document processing events
+    DOCUMENT_PROCESSING_STARTED = "document_processing_started"
+    DOCUMENT_PROCESSING_COMPLETED = "document_processing_completed"
+    DOCUMENT_PROCESSING_FAILED = "document_processing_failed"
     
     # 性能指标
     PERFORMANCE_METRIC = "performance_metric"

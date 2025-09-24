@@ -219,7 +219,6 @@ class MatchGroup(SQLModel, table=True):
     right_chunk_id: int = Field(foreign_key="document_chunk.id", nullable=False, index=True)
     final_score: Optional[float] = Field(default=None)
     semantic_score: Optional[float] = Field(default=None)
-    lexical_overlap: Optional[float] = Field(default=None)
     cross_score: Optional[float] = Field(default=None)
     alignment_ratio: Optional[float] = Field(default=None)
     span_count: int = Field(default=0, nullable=False)
@@ -242,7 +241,6 @@ class MatchDetail(SQLModel, table=True):
     right_chunk_id: int = Field(foreign_key="document_chunk.id", nullable=False, index=True)
     final_score: Optional[float] = Field(default=None)
     semantic_score: Optional[float] = Field(default=None)
-    lexical_overlap: Optional[float] = Field(default=None)
     cross_score: Optional[float] = Field(default=None)
     spans_json: Optional[dict] = Field(default=None, sa_column=Column(JSON, nullable=True))
 

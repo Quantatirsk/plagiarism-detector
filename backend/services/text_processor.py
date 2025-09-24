@@ -3,7 +3,9 @@
 使用 spaCy 进行中英文句子分割，支持混合语言文档
 """
 import re
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Optional
+import hashlib
+from functools import lru_cache
 import spacy
 from spacy.language import Language
 from langdetect import detect, LangDetectException
@@ -18,6 +20,10 @@ class TextProcessor(BaseService):
         """初始化 spaCy 模型"""
         self.nlp_zh = None
         self.nlp_en = None
+        # Linus: "KISS" - 使用 OrderedDict 实现简单的 LRU 缓存
+        from collections import OrderedDict
+        self._cache = OrderedDict()  # 缓存分割结果
+        self._cache_max_size = 1000  # 最大缓存条目数
         self._init_chinese_model()
         self._init_english_model()
 
@@ -123,10 +129,48 @@ class TextProcessor(BaseService):
         if "merge_short_sentences_zh" not in self.nlp_zh.pipe_names:
             self.nlp_zh.add_pipe("merge_short_sentences_zh", after="zh_number_protector")
 
+    def _compute_text_hash(self, text: str, params: Optional[Dict] = None) -> str:
+        """计算文本哈希值，用于缓存键"""
+        # 包含文本内容和处理参数的哈希
+        cache_key = text
+        if params:
+            cache_key += str(sorted(params.items()))
+        return hashlib.md5(cache_key.encode('utf-8')).hexdigest()
+
+    def _get_from_cache(self, cache_key: str) -> Optional[any]:
+        """从缓存获取结果"""
+        if cache_key in self._cache:
+            # Linus: "Data structures" - 移到末尾实现 LRU
+            self._cache.move_to_end(cache_key)
+            return self._cache[cache_key]
+        return None
+
+    def _add_to_cache(self, cache_key: str, result: any) -> None:
+        """添加到缓存，实现真正的 LRU 策略"""
+        if cache_key in self._cache:
+            # 更新已存在的项并移到末尾
+            self._cache.move_to_end(cache_key)
+        else:
+            # 添加新项
+            if len(self._cache) >= self._cache_max_size:
+                # 删除最早的缓存项（LRU）
+                self._cache.popitem(last=False)
+            self._cache[cache_key] = result
+
+    def clear_cache(self) -> None:
+        """清空缓存"""
+        self._cache.clear()
+        # 清空语言检测的 LRU 缓存
+        self.detect_language.cache_clear()
+        self.logger.info("文本处理缓存已清空")
+
+    @lru_cache(maxsize=1024)
     def detect_language(self, text: str) -> str:
         """
         使用 langdetect 检测文本语言
         返回 'zh' 或 'en'
+
+        Linus: "Good programmers worry about data structures" - 使用 LRU 缓存避免重复检测
         """
         # 清理文本
         clean_text = text.strip()
@@ -151,20 +195,6 @@ class TextProcessor(BaseService):
             self.logger.warning(f"语言检测失败，默认使用中文模型")
             return 'zh'
 
-    def split_paragraphs(self, text: str, min_length: int = 20, max_chars: int = 600) -> List[str]:
-        """分割段落 - 使用单换行符作为段落分隔符，并对超长段落进行分割"""
-        self._ensure_initialized()
-        # 按单个换行符分割
-        lines = text.split('\n')
-        # 过滤空行和太短的段落
-        paragraphs = []
-        for line in lines:
-            line = line.strip()
-            if line and len(line) > min_length:
-                # 对超长段落进行分割
-                sub_paragraphs = self._split_long_paragraph_internal(line, max_chars)
-                paragraphs.extend(sub_paragraphs)
-        return paragraphs
 
     def _split_long_paragraph_internal(self, paragraph: str, max_chars: int = 600) -> List[str]:
         """分割超长段落，确保不超过最大字符数限制"""
@@ -237,27 +267,52 @@ class TextProcessor(BaseService):
 
         return result
 
-    def split_paragraphs_with_spans(
+    def split_paragraphs(
         self,
         text: str,
         min_length: int = 20,
         max_chars: int = 600,
     ) -> List[Tuple[str, int, int]]:
-        """Split text into paragraphs while retaining offsets."""
+        """
+        分割段落 - 使用单换行符作为段落分隔符，并对超长段落进行分割
+        返回: [(text, start, end), ...]
+        """
 
         self._ensure_initialized()
         if not text:
             return []
 
-        segments: List[Tuple[str, int, int]] = []
-        pattern = re.compile(r"(?s)(.+?)(?:\n\s*\n|$)")
+        # 生成缓存键
+        cache_params = {"min_length": min_length, "max_chars": max_chars, "method": "paragraphs_with_spans"}
+        cache_key = self._compute_text_hash(text, cache_params)
 
-        for match in pattern.finditer(text):
-            raw_start = match.start(1)
-            raw_end = match.end(1)
-            start, end = self._trim_whitespace_bounds(text, raw_start, raw_end)
-            if end - start < min_length:
+        # 尝试从缓存获取
+        cached_result = self._get_from_cache(cache_key)
+        if cached_result is not None:
+            self.logger.debug(f"段落分割结果从缓存返回: {cache_key[:8]}...")
+            return cached_result
+
+        segments: List[Tuple[str, int, int]] = []
+        # 使用单换行符分割段落
+        lines = text.split('\n')
+        current_pos = 0
+
+        for line in lines:
+            line_start = current_pos
+            line_end = current_pos + len(line)
+
+            # 更新位置，考虑换行符
+            current_pos = line_end + 1  # +1 for '\n'
+
+            # 去除首尾空白
+            trimmed_line = line.strip()
+            if not trimmed_line or len(trimmed_line) < min_length:
                 continue
+
+            # 计算实际的文本位置（去除首尾空白后）
+            start_offset = line.find(trimmed_line)
+            start = line_start + start_offset
+            end = start + len(trimmed_line)
 
             paragraph_text = text[start:end]
             lang = self.detect_language(paragraph_text)
@@ -267,6 +322,9 @@ class TextProcessor(BaseService):
                     continue
                 segments.append((text[seg_start:seg_end], seg_start, seg_end))
 
+        # 存入缓存
+        self._add_to_cache(cache_key, segments)
+        self.logger.debug(f"段落分割结果已缓存: {cache_key[:8]}...")
         return segments
 
     def _trim_whitespace_bounds(self, text: str, start: int, end: int) -> Tuple[int, int]:
@@ -287,97 +345,44 @@ class TextProcessor(BaseService):
         if length <= max_chars:
             return [(absolute_start, absolute_start + length)]
 
-        delimiters = ['。', '；', '！', '？'] if lang == 'zh' else ['. ', '; ', '? ', '! ']
+        # 对于超长段落，使用 _split_long_paragraph_internal 的逻辑
+        # 这个方法已经支持基于标点符号的智能分割
+        sub_paragraphs = self._split_long_paragraph_internal(paragraph_text, max_chars)
+
         segments: List[Tuple[int, int]] = []
         cursor = 0
 
-        while cursor < length:
-            remaining = length - cursor
-            if remaining <= max_chars:
-                segments.append((absolute_start + cursor, absolute_start + length))
-                break
+        for sub_para in sub_paragraphs:
+            # 在原段落中找到子段落的位置
+            start_idx = paragraph_text.find(sub_para, cursor)
+            if start_idx == -1:
+                continue
 
-            window_end = cursor + max_chars
-            window_text = paragraph_text[cursor:window_end]
-            split_index = -1
-            for delimiter in delimiters:
-                idx = window_text.rfind(delimiter)
-                if idx != -1 and idx > split_index:
-                    split_index = idx + len(delimiter)
-
-            if split_index <= 0:
-                split_index = max_chars
-
-            segment_end = cursor + split_index
-            segments.append((absolute_start + cursor, absolute_start + segment_end))
-            cursor = segment_end
+            end_idx = start_idx + len(sub_para)
+            segments.append((absolute_start + start_idx, absolute_start + end_idx))
+            cursor = end_idx
 
         return segments
 
-    def split_sentences(self, text: str, min_length: int = 20) -> List[str]:
+
+    def split_sentences(self, text: str, min_length: int = 20) -> List[Tuple[str, int, int]]:
         """
         使用双语言模型分割句子
-        先按行分割，然后根据每行的语言选择对应的模型
+        返回: [(text, start, end), ...]
         """
         self._ensure_initialized()
         if not text:
             return []
 
-        # 按单个换行符分割成行
-        lines = text.split('\n')
-        all_sentences = []
+        # 生成缓存键
+        cache_params = {"min_length": min_length, "method": "sentences_with_spans"}
+        cache_key = self._compute_text_hash(text, cache_params)
 
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-
-            # 检测这一行的语言
-            lang = self.detect_language(line)
-
-            # 中文、英文使用不同的最小长度阈值
-            if lang == "zh":
-                actual_min_length = max(min_length, 20)
-            else:
-                actual_min_length = max(min_length, 40)
-
-            # 选择合适的模型
-            if lang == "zh" and self.nlp_zh:
-                nlp = self.nlp_zh
-            elif lang == "en" and self.nlp_en:
-                nlp = self.nlp_en
-            else:
-                # 回退到正则表达式方法
-                sentences = self._split_sentences_regex(line, actual_min_length)
-                all_sentences.extend(sentences)
-                continue
-
-            try:
-                # 使用 spaCy 处理文本
-                doc = nlp(line)
-
-                # 提取句子
-                for sent in doc.sents:
-                    sentence_text = sent.text.strip()
-                    # 过滤太短的句子
-                    if sentence_text and len(sentence_text) >= actual_min_length:
-                        all_sentences.append(sentence_text)
-
-            except Exception as e:
-                self.logger.error(f"spaCy 句子分割失败: {e}")
-                # 回退到正则表达式方法
-                sentences = self._split_sentences_regex(line, actual_min_length)
-                all_sentences.extend(sentences)
-
-        return all_sentences
-
-    def split_sentences_with_spans(self, text: str, min_length: int = 20) -> List[Tuple[str, int, int]]:
-        """
-        使用双语言模型分割句子并返回(text, start, end)偏移
-        """
-        self._ensure_initialized()
-        if not text:
-            return []
+        # 尝试从缓存获取
+        cached_result = self._get_from_cache(cache_key)
+        if cached_result is not None:
+            self.logger.debug(f"句子分割结果从缓存返回: {cache_key[:8]}...")
+            return cached_result
 
         # 按单个换行符分割成行
         lines = text.split('\n')
@@ -404,7 +409,7 @@ class TextProcessor(BaseService):
                     nlp = self.nlp_en
                 else:
                     # 回退到正则表达式方法
-                    spans = self._split_sentences_with_spans_regex(line_stripped, actual_min_length)
+                    spans = self._split_sentences_regex(line_stripped, actual_min_length)
                     # 调整偏移量
                     for sent_text, start, end in spans:
                         actual_start = line_start_in_text + line.find(line_stripped) + start
@@ -446,7 +451,7 @@ class TextProcessor(BaseService):
                 except Exception as e:
                     self.logger.error(f"spaCy 句子分割（带偏移）失败: {e}")
                     # 回退到正则表达式方法
-                    spans = self._split_sentences_with_spans_regex(line_stripped, actual_min_length)
+                    spans = self._split_sentences_regex(line_stripped, actual_min_length)
                     # 调整偏移量
                     for sent_text, start, end in spans:
                         actual_start = line_start_in_text + line.find(line_stripped) + start
@@ -456,55 +461,92 @@ class TextProcessor(BaseService):
             # 更新游标位置（包括换行符）
             text_cursor += len(line) + 1  # +1 for newline
 
+        # 存入缓存
+        self._add_to_cache(cache_key, all_spans)
+        self.logger.debug(f"句子分割结果已缓存: {cache_key[:8]}...")
         return all_spans
 
-    def _split_sentences_regex(self, text: str, min_length: int = 20) -> List[str]:
-        """正则表达式分割句子 - 作为回退方案"""
-        # 改进的正则表达式：处理中英文标点
-        sentences = []
+    def _split_sentences_regex(self, text: str, min_length: int = 20) -> List[Tuple[str, int, int]]:
+        """正则表达式分割句子并返回偏移 - 作为回退方案"""
+        # Linus: "KISS" - 直接实现，避免二次查找
+        spans: List[Tuple[str, int, int]] = []
+
         # 分割位置：句号、问号、感叹号、分号后
-        split_pattern = r'(?<=[.!?。！？；])'
+        split_pattern = r'([.!?。！？；])'
         parts = re.split(split_pattern, text)
 
-        current_sentence = ""
-        for part in parts:
-            current_sentence += part
-            # 如果当前累积的文本以句子结束符结尾
-            if re.search(r'[.!?。！？；]\s*$', current_sentence):
-                sentence = current_sentence.strip()
+        current_start = 0
+        current_text = ""
+
+        i = 0
+        while i < len(parts):
+            current_text += parts[i]
+
+            # 如果下一个是标点符号，也加上
+            if i + 1 < len(parts) and re.match(r'[.!?。！？；]', parts[i + 1]):
+                current_text += parts[i + 1]
+                i += 1
+
+                # 这是一个完整的句子
+                sentence = current_text.strip()
                 if sentence and len(sentence) >= min_length:
-                    sentences.append(sentence)
-                current_sentence = ""
+                    # 找到实际文本的起始位置（跳过空白）
+                    actual_start = current_start
+                    while actual_start < current_start + len(current_text) and text[actual_start].isspace():
+                        actual_start += 1
+
+                    spans.append((sentence, actual_start, actual_start + len(sentence)))
+
+                current_start += len(current_text)
+                current_text = ""
+
+            i += 1
 
         # 处理最后剩余的部分
-        if current_sentence.strip() and len(current_sentence.strip()) >= min_length:
-            sentences.append(current_sentence.strip())
-
-        return sentences
-
-    def _split_sentences_with_spans_regex(self, text: str, min_length: int = 20) -> List[Tuple[str, int, int]]:
-        """正则表达式分割句子并返回偏移 - 作为回退方案"""
-        # 先使用基础方法获取句子
-        sentences = self._split_sentences_regex(text, min_length)
-
-        spans: List[Tuple[str, int, int]] = []
-        cursor = 0
-
-        for sentence in sentences:
-            # 在原文中查找句子位置
-            idx = text.find(sentence, cursor)
-            if idx == -1:
-                # 容错：回退到全局搜索
-                idx = text.find(sentence)
-                if idx == -1:
-                    continue
-
-            start = idx
-            end = idx + len(sentence)
-            spans.append((sentence, start, end))
-            cursor = end
+        if current_text.strip() and len(current_text.strip()) >= min_length:
+            sentence = current_text.strip()
+            actual_start = current_start
+            while actual_start < current_start + len(current_text) and text[actual_start].isspace():
+                actual_start += 1
+            spans.append((sentence, actual_start, actual_start + len(sentence)))
 
         return spans
+
+    # Linus: "Perfect is the enemy of good" - 删除伪批量处理
+    # 这些方法只是简单循环，没有真正的批量优化
+
+    def process_documents_batch(
+        self,
+        texts: List[str],
+        min_length: int = 20,
+        max_chars: int = 600,
+    ) -> List[Dict[str, any]]:
+        """批量处理文档，返回段落和句子分割结果"""
+        self._ensure_initialized()
+        results = []
+
+        for text in texts:
+            # 处理每个文档
+            paragraphs = self.split_paragraphs(text, min_length, max_chars)
+            sentences = self.split_sentences(text, min_length)
+
+            results.append({
+                "paragraphs": paragraphs,
+                "sentences": sentences,
+                "text_length": len(text),
+                "paragraph_count": len(paragraphs),
+                "sentence_count": len(sentences),
+            })
+
+        self.logger.info(
+            f"批量处理了 {len(texts)} 个文档，"
+            f"共 {sum(r['paragraph_count'] for r in results)} 个段落，"
+            f"{sum(r['sentence_count'] for r in results)} 个句子"
+        )
+        return results
+
+    # Linus: "Don't design for the future" - 删除未使用的方法
+    # align_chunks 方法过于简单且未被使用
 
     @staticmethod
     def clean_text(text: str) -> str:

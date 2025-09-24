@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.core.logging import get_logger
@@ -111,21 +111,82 @@ async def list_project_jobs(
     return ProjectJobListResponse(items=[ProjectJobResponse.from_model(job) for job in jobs])
 
 
+class ProjectComparisonTaskResponse(BaseModel):
+    task_id: str
+    job_id: Optional[int] = None
+    message: str
+
+
 @router.post(
     "/{project_id}/run-comparisons",
-    response_model=ProjectJobResponse,
+    response_model=ProjectComparisonTaskResponse,
     summary="Run or rerun comparisons for a project",
 )
 async def run_project_comparisons(
     project_id: int,
+    background_tasks: BackgroundTasks,
     orchestrator: DetectionOrchestrator = Depends(_orchestrator),
-) -> ProjectJobResponse:
+) -> ProjectComparisonTaskResponse:
     project = await orchestrator.fetch_project(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    job = await orchestrator.run_project_comparisons(project_id)
-    if not job:
-        raise HTTPException(status_code=400, detail="At least two completed documents are required to run comparisons")
+    # Check if there are enough documents
+    from backend.db.models import Document, DocumentStatus
+    from backend.db import get_session
+    from sqlalchemy import select
 
-    return ProjectJobResponse.from_model(job)
+    async with get_session() as session:
+        stmt = (
+            select(Document)
+            .where(Document.project_id == project_id)
+            .where(Document.status == DocumentStatus.COMPLETED)
+        )
+        documents = (await session.exec(stmt)).all()
+
+    if len(documents) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="At least two completed documents are required to run comparisons"
+        )
+
+    # Create a progress task for the comparison job
+    from backend.services.progress_tracker import ProgressTracker, ProgressType
+    progress_tracker = ProgressTracker()
+
+    comparison_task_id = progress_tracker.create_task(
+        task_type=ProgressType.COMPARISON_JOB,
+        description=f"Running comparisons for project {project_id}",
+        total_steps=1,  # Will be updated once we know the pair count
+        metadata={"project_id": project_id}
+    )
+
+    # Run comparisons asynchronously
+    async def run_comparisons():
+        await progress_tracker.start_task(comparison_task_id)
+        try:
+            job = await orchestrator.run_project_comparisons(project_id)
+            if job:
+                # Note: job ID is already in the metadata when the task was created
+                await progress_tracker.complete_task(
+                    comparison_task_id,
+                    message=f"Comparisons completed for project {project_id}"
+                )
+            else:
+                await progress_tracker.fail_task(
+                    comparison_task_id,
+                    error_message="Failed to create comparison job"
+                )
+        except Exception as exc:
+            logger.error("Project comparison failed", project_id=project_id, error=str(exc))
+            await progress_tracker.fail_task(
+                comparison_task_id,
+                error_message=f"Comparison failed: {str(exc)}"
+            )
+
+    background_tasks.add_task(run_comparisons)
+
+    return ProjectComparisonTaskResponse(
+        task_id=comparison_task_id,
+        message=f"Started comparison process for project {project_id}"
+    )

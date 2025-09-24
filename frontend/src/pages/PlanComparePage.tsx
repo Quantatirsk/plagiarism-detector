@@ -12,6 +12,7 @@ import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MatchInfoTooltip } from '@/components/ui/match-info-popover';
 import { cn } from '@/lib/utils';
+import { buildSegmentsWithOverlap, type HighlightInterval as ImportedHighlightInterval } from '@/utils/highlightUtilsSimple';
 
 type Side = 'left' | 'right';
 type DocumentLookup = Record<number, DocumentSummary>;
@@ -39,20 +40,19 @@ type NormalisedMatch = {
 
 type HighlightMode = 'block' | 'fragment';
 
-type HighlightInterval = {
-  start: number;
-  end: number;
-  matchKey: string;
-  ordinal: number;
-  side: Side;
-  mode: HighlightMode;
-};
+// Use the imported type and extend it for compatibility
+type HighlightInterval = ImportedHighlightInterval;
 
 type Segment = {
   text: string;
   matchKey?: string;
   ordinal?: number;
   mode?: HighlightMode;
+  allMatches?: Array<{
+    matchKey: string;
+    ordinal: number;
+    mode: HighlightMode;
+  }>;
 };
 
 export function PlanComparePage({
@@ -75,8 +75,9 @@ export function PlanComparePage({
       acc[detail.group_id].push(detail);
       return acc;
     }, {});
+    // Use group.id as the primary key for consistent matching across sides
     return report.groups.map((group) => ({
-      key: `${group.id}-${group.left_chunk_id}-${group.right_chunk_id}`,
+      key: `group-${group.id}`,
       group,
       details: detailByGroup[group.id] || [],
     }));
@@ -98,14 +99,15 @@ export function PlanComparePage({
   const leftIntervals = useMemo(() => prepareIntervals(leftDocument?.processed_text ?? '', matches, 'left'), [leftDocument?.processed_text, matches]);
   const rightIntervals = useMemo(() => prepareIntervals(rightDocument?.processed_text ?? '', matches, 'right'), [rightDocument?.processed_text, matches]);
 
-  const leftSegments = useMemo(() => buildSegments(leftDocument?.processed_text ?? '', leftIntervals), [leftDocument?.processed_text, leftIntervals]);
-  const rightSegments = useMemo(() => buildSegments(rightDocument?.processed_text ?? '', rightIntervals), [rightDocument?.processed_text, rightIntervals]);
+  const leftSegments = useMemo(() => buildSegmentsWithOverlap(leftDocument?.processed_text ?? '', leftIntervals), [leftDocument?.processed_text, leftIntervals]);
+  const rightSegments = useMemo(() => buildSegmentsWithOverlap(rightDocument?.processed_text ?? '', rightIntervals), [rightDocument?.processed_text, rightIntervals]);
 
   const jumpToMatch = useCallback((target: Side, matchKey: string, shouldFocus: boolean = false) => {
     if (!matchKey) {
       return;
     }
-    const targetNode = document.querySelector<HTMLElement>(`mark[data-side="${target}"][data-match-key="${matchKey}"]`);
+    // 修复选择器以支持新的 data-match-keys 属性
+    const targetNode = document.querySelector<HTMLElement>(`mark[data-side="${target}"][data-match-keys*="${matchKey}"]`);
     if (targetNode) {
       // Find the scrollable container for the document pane
       const scrollContainer = targetNode.closest('.overflow-auto');
@@ -268,8 +270,7 @@ export function PlanComparePage({
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                           <span>语义 {formatScore(group.semantic_score)}</span>
-                          <span>词汇 {formatScore(group.lexical_overlap)}</span>
-                          <span>片段 {group.match_count}</span>
+                          <span>交叉编码 {formatScore(group.cross_score)}</span>
                         </div>
                       </button>
                     </li>
@@ -517,41 +518,21 @@ const RenderSegments = memo(({ segments, activeKey, side, matches, onSelectMatch
     return null;
   }
 
-  // Debug: Log segment and match information
-  React.useEffect(() => {
-    const segmentsWithKeys = segments.filter(s => s.matchKey);
-    const uniqueSegmentKeys = new Set(segmentsWithKeys.map(s => s.matchKey));
-    const availableMatchKeys = new Set(matches.map(m => m.key));
-    const missingKeys = Array.from(uniqueSegmentKeys).filter(key => !availableMatchKeys.has(key!));
-
-    console.log(`[${side}] RenderSegments Debug:`, {
-      totalSegments: segments.length,
-      segmentsWithKeys: segmentsWithKeys.length,
-      uniqueKeys: uniqueSegmentKeys.size,
-      totalMatches: matches.length,
-      sampleSegmentKeys: Array.from(uniqueSegmentKeys).slice(0, 3),
-      sampleMatchKeys: matches.slice(0, 3).map(m => m.key),
-      missingKeysCount: missingKeys.length
-    });
-
-    if (missingKeys.length > 0) {
-      console.warn(`[${side}] Segments with matchKeys not found in matches:`, {
-        missingKeys,
-        sampleMissingSegment: segments.find(s => s.matchKey && missingKeys.includes(s.matchKey))
-      });
-    }
-  }, [segments, matches, side]);
 
   return <>{segments.map((segment, index) => {
     if (!segment.matchKey) {
       return <span key={`plain-${index}`}>{segment.text}</span>;
     }
 
-    // Find all matches for this segment (handle 1-to-many cases)
-    const matchesForSegment = matches.filter(m => m.key === segment.matchKey);
-    const match = matchesForSegment[0] || null;
+    const match = matches.find(m => m.key === segment.matchKey) || null;
     const isActive = activeKey === segment.matchKey;
     const ordinal = segment.ordinal ?? 0;
+
+    // Check if this segment has overlapping matches
+    const hasOverlaps = segment.allMatches && segment.allMatches.length > 1;
+    const overlappingMatches = hasOverlaps
+      ? segment.allMatches!.map(am => matches.find(m => m.key === am.matchKey)).filter(Boolean)
+      : [match].filter(Boolean);
     const baseClasses =
       'rounded-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary/60 break-words match-highlight';
 
@@ -563,21 +544,20 @@ const RenderSegments = memo(({ segments, activeKey, side, matches, onSelectMatch
         : `${colorClasses} text-foreground underline decoration-black decoration-2 underline-offset-2`;
     const activeClasses = isActive ? 'active-match' : '';
 
-    if (!match) {
-      // No match found - just render the mark without popover
-      console.warn('No match found for segment:', {
-        matchKey: segment.matchKey,
-        text: segment.text.substring(0, 50) + '...',
-        availableMatches: matches.map(m => m.key)
-      });
+    // Add visual indicator for multiple overlapping matches
+    const overlappingClasses = hasOverlaps
+      ? 'ring-2 ring-primary/40 ring-offset-1'
+      : '';
 
+    if (!match) {
+      // No match found - still render for visual consistency
       return (
         <mark
           key={`highlight-${index}`}
-          id={makeHighlightId(side, segment.matchKey, ordinal)}
-          className={cn(baseClasses, backgroundClasses, activeClasses)}
+          id={makeHighlightId(side, segment.matchKey || '', ordinal)}
+          className={cn(baseClasses, backgroundClasses, activeClasses, overlappingClasses)}
           tabIndex={0}
-          data-match-key={segment.matchKey}
+          data-match-keys={segment.matchKey}
           data-side={side}
           data-mode={segment.mode}
           data-ordinal={ordinal}
@@ -595,21 +575,16 @@ const RenderSegments = memo(({ segments, activeKey, side, matches, onSelectMatch
     }
 
     return (
-      <MatchInfoTooltip key={`highlight-${index}`} match={match} allMatches={matchesForSegment}>
+      <MatchInfoTooltip key={`highlight-${index}`} match={match} allMatches={overlappingMatches}>
         <mark
-          id={makeHighlightId(side, segment.matchKey, ordinal)}
-          className={cn(baseClasses, backgroundClasses, activeClasses)}
+          id={makeHighlightId(side, segment.matchKey || '', ordinal)}
+          className={cn(baseClasses, backgroundClasses, activeClasses, overlappingClasses)}
           tabIndex={0}
-          data-match-key={segment.matchKey}
+          data-match-keys={segment.matchKey}
           data-side={side}
           data-mode={segment.mode}
           data-ordinal={ordinal}
           onClick={() => {
-            console.log('Mark clicked:', {
-              matchKey: segment.matchKey,
-              hasMatch: !!match,
-              matchDetails: match?.details?.length || 0
-            });
             onSelectMatch(segment.matchKey!);
           }}
           onKeyDown={(event) => {
@@ -637,24 +612,19 @@ function prepareIntervals(text: string, matches: NormalisedMatch[], side: Side):
     // Try document_spans first, fallback to paragraph_spans
     const spans = match.group.document_spans ?? match.group.paragraph_spans ?? [];
 
-    // Debug logging
-    if (!match.group.document_spans?.length) {
-      console.log(`[${side}] Match ${match.key} using paragraph_spans (${match.group.paragraph_spans?.length || 0} spans)`);
-    }
 
     const sideSpans = spans
       .map((span) => ({
         start: side === 'left' ? span.left_start : span.right_start,
         end: side === 'left' ? span.left_end : span.right_end,
       }))
-      .filter((item) => Number.isFinite(item.start) && Number.isFinite(item.end) && item.end > item.start);
+      .filter((item) => {
+        // More robust validation - allow zero positions
+        return Number.isFinite(item.start) && Number.isFinite(item.end) &&
+               item.start >= 0 && item.end >= 0 && item.end > item.start;
+      });
 
     if (!sideSpans.length) {
-      console.warn(`[${side}] Match ${match.key} has no valid spans after filtering`, {
-        documentSpans: match.group.document_spans?.length || 0,
-        paragraphSpans: match.group.paragraph_spans?.length || 0,
-        group: match.group
-      });
       return;
     }
 
@@ -669,8 +639,8 @@ function prepareIntervals(text: string, matches: NormalisedMatch[], side: Side):
     if (!seen.has(blockKey)) {
       seen.add(blockKey);
       raw.push({
-        start: clampNumber(minStart),
-        end: clampNumber(maxEnd),
+        start: minStart,
+        end: maxEnd,
         matchKey: match.key,
         ordinal: blockOrdinal,
         side,
@@ -688,8 +658,8 @@ function prepareIntervals(text: string, matches: NormalisedMatch[], side: Side):
         }
         seen.add(key);
         raw.push({
-          start: clampNumber(start),
-          end: clampNumber(end),
+          start: start,
+          end: end,
           matchKey: match.key,
           ordinal: nextOrdinal,
           side,
@@ -701,88 +671,14 @@ function prepareIntervals(text: string, matches: NormalisedMatch[], side: Side):
 
     ordinalMap.set(match.key, nextOrdinal);
   });
-  return mergeIntervals(raw);
-}
-
-function mergeIntervals(intervals: HighlightInterval[]): HighlightInterval[] {
-  if (intervals.length <= 1) {
-    return intervals.slice();
-  }
-  const sorted = intervals
-    .map((interval) => ({ ...interval }))
-    .sort((a, b) => (a.start !== b.start ? a.start - b.start : a.end - b.end));
-
-  const merged: HighlightInterval[] = [];
-  const MERGE_DISTANCE = 16;
-
-  sorted.forEach((interval) => {
-    const last = merged[merged.length - 1];
-    if (
-      last &&
-      last.matchKey === interval.matchKey &&
-      last.mode === interval.mode &&
-      interval.start <= last.end + MERGE_DISTANCE
-    ) {
-      last.end = Math.max(last.end, interval.end);
-      last.ordinal = Math.min(last.ordinal, interval.ordinal);
-    } else {
-      merged.push(interval);
-    }
-  });
-  return merged;
-}
-
-function buildSegments(text: string, intervals: HighlightInterval[]): Segment[] {
-  if (!intervals.length) {
-    return text ? [{ text }] : [];
-  }
-  const sorted = intervals
-    .map((interval) => ({ ...interval }))
-    .filter((interval) => interval.end > interval.start)
-    .sort((a, b) => (a.start !== b.start ? a.start - b.start : a.end - b.end));
-
-  const segments: Segment[] = [];
-  let cursor = 0;
-  sorted.forEach((interval) => {
-    const start = clamp(interval.start, text.length);
-    const end = clamp(interval.end, text.length);
-    if (end <= cursor) {
-      return;
-    }
-
-    const clippedStart = Math.max(start, cursor);
-    if (clippedStart > cursor) {
-      segments.push({ text: text.slice(cursor, clippedStart) });
-    }
-
-    if (end > clippedStart) {
-      segments.push({
-        text: text.slice(clippedStart, end),
-        matchKey: interval.matchKey,
-        ordinal: interval.ordinal,
-        mode: interval.mode,
-      });
-      cursor = end;
-    } else {
-      cursor = clippedStart;
-    }
-  });
-  if (cursor < text.length) {
-    segments.push({ text: text.slice(cursor) });
-  }
-  return segments;
+  return raw;  // 不再需要 mergeIntervals，因为 buildSegmentsWithOverlap 会处理重叠
 }
 
 function makeHighlightId(side: Side, matchKey: string, ordinal: number) {
   return `${side}-match-${matchKey}-${ordinal}`;
 }
 
-function clampNumber(value: number) {
-  return Number.isFinite(value) ? value : 0;
-}
-
-
-
+// 删除了 clampNumber 函数 - 不再需要
 
 function formatDocumentLabel(
   documentId: number,
@@ -820,11 +716,6 @@ function getScoreColorClasses(score: number | null | undefined, isBackground = f
   }
 }
 
-function clamp(value: number, length: number) {
-  if (Number.isNaN(value) || !Number.isFinite(value)) {
-    return 0;
-  }
-  return Math.max(0, Math.min(Math.floor(value), length));
-}
+// 删除了 clamp 函数 - 不再需要
 
 export default PlanComparePage;

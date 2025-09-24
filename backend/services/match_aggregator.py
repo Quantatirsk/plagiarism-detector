@@ -12,7 +12,6 @@ from backend.services.types import SpanPayload
 class MatchState:
     final_score: Optional[float]
     semantic_score: Optional[float]
-    lexical_overlap: Optional[float]
     cross_score: Optional[float]
     spans: Sequence[SpanPayload]
 
@@ -27,16 +26,41 @@ class MatchAggregator:
         right_map: Dict[int, DocumentChunk],
         left_lookup: Dict[int, int],
         right_lookup: Dict[int, int],
+        best_match_only: bool = False,  # 新增参数：是否只保留最佳匹配
     ) -> None:
         self.left_map = left_map
         self.right_map = right_map
         self.left_lookup = left_lookup
         self.right_lookup = right_lookup
+        self.best_match_only = best_match_only
         self._records: Dict[tuple[int, int], Dict[str, object]] = {}
+        # 追踪每个左侧段落的最佳匹配（仅在best_match_only=True时使用）
+        self._best_matches: Dict[int, tuple[int, float]] = {}
 
     def add(self, left_id: int, right_id: int, state: MatchState) -> None:
         left_parent = self.left_lookup.get(left_id, left_id)
         right_parent = self.right_lookup.get(right_id, right_id)
+
+        # 如果启用最佳匹配模式
+        if self.best_match_only:
+            current_score = state.final_score or 0.0
+
+            # 检查是否已有该左侧段落的匹配
+            if left_parent in self._best_matches:
+                best_right, best_score = self._best_matches[left_parent]
+
+                # 如果当前分数不如已有最佳匹配，则跳过
+                if current_score <= best_score:
+                    return
+
+                # 移除旧的最佳匹配记录
+                old_key = (left_parent, best_right)
+                if old_key in self._records:
+                    del self._records[old_key]
+
+            # 更新最佳匹配
+            self._best_matches[left_parent] = (right_parent, current_score)
+
         key = (left_parent, right_parent)
         record = self._records.get(key)
         if not record:
@@ -45,7 +69,6 @@ class MatchAggregator:
                 "right_chunk_id": right_parent,
                 "final_score": None,
                 "semantic_score": None,
-                "lexical_overlap": None,
                 "cross_score": None,
                 "span_set": set(),
                 "doc_span_set": set(),
@@ -56,7 +79,6 @@ class MatchAggregator:
 
         record["final_score"] = self._max_optional(record["final_score"], state.final_score)
         record["semantic_score"] = self._max_optional(record["semantic_score"], state.semantic_score)
-        record["lexical_overlap"] = self._max_optional(record["lexical_overlap"], state.lexical_overlap)
         record["cross_score"] = self._max_optional(record["cross_score"], state.cross_score)
         record["match_count"] = int(record["match_count"]) + 1
 
@@ -83,7 +105,6 @@ class MatchAggregator:
                 "right_chunk_id": right_id,
                 "final_score": state.final_score,
                 "semantic_score": state.semantic_score,
-                "lexical_overlap": state.lexical_overlap,
                 "cross_score": state.cross_score,
                 "group_pair": (left_parent, right_parent),
                 "spans": [
@@ -139,7 +160,6 @@ class MatchAggregator:
                 "right_chunk_id": right_parent,
                 "final_score": record["final_score"],
                 "semantic_score": record["semantic_score"],
-                "lexical_overlap": record["lexical_overlap"],
                 "cross_score": record["cross_score"],
                 "alignment_ratio": alignment_ratio,
                 "span_count": len(document_spans) or len(spans),
@@ -161,7 +181,6 @@ class MatchAggregator:
                 (
                     "final_score",
                     "semantic_score",
-                    "lexical_overlap",
                     "cross_score",
                     "alignment_ratio",
                 ),
@@ -173,8 +192,7 @@ class MatchAggregator:
                         (
                             "final_score",
                             "semantic_score",
-                            "lexical_overlap",
-                            "cross_score",
+                                    "cross_score",
                         ),
                     )
             results.append(result)

@@ -103,6 +103,9 @@ Key environment variables in `.env`:
 - `EMBEDDING_MODEL`: Embedding model (Qwen3-Embedding-8B)
 - `EMBEDDING_DIMENSIONS`: Vector dimensions (4096 for current model)
 - `MILVUS_MODE`: Storage mode (local/server)
+- `RERANKER_PROVIDER`: Cross-encoder provider ("jina" or "openai")
+- `RERANKER_MODEL`: OpenAI-compatible reranker model (Qwen3-Reranker-0.6B)
+- `JINA_API_KEY`: API key for Jina reranker (when RERANKER_PROVIDER="jina")
 
 ### Development Workflow
 
@@ -123,6 +126,28 @@ Current implementation status tracked in todo list - use TodoWrite to update pro
 - **Batch Size**: Reduced to 20 for current model limitations
 - **Local Development**: Always start with `MILVUS_MODE=local` to avoid server dependencies
 - **Schema Management**: MilvusClient handles schema automatically in local mode, explicit schema required for server mode
+- **Match Strategy**: Default matching strategy is now `bidirectional_stable` (互为最佳匹配), preventing one-to-many matches
+
+### Cross-Encoder Configuration
+
+The system supports multiple cross-encoder providers for reranking:
+
+1. **OpenAI-compatible API** (Default):
+   - Model: `Qwen3-Reranker-0.6B` (or any compatible model)
+   - Uses same API endpoint as embeddings (vect.one)
+   - Default provider, no additional configuration needed
+
+2. **Jina AI**:
+   - Model: `jina-reranker-v2-base-multilingual`
+   - Requires `JINA_API_KEY` in environment
+   - Multi-language support
+   - Configure via `RERANKER_PROVIDER="jina"`
+
+To switch between providers:
+```bash
+# In .env file
+RERANKER_PROVIDER="openai"  # or "jina"
+```
 
 ## Common Development Tasks
 
@@ -152,6 +177,20 @@ async def test():
     print(f"Vector dimensions: {len(vector)}")  # Should be 4096
 
 asyncio.run(test())
+```
+
+### Test Cross-Encoder Service
+
+```bash
+# Test current provider
+python scripts/test_cross_encoder.py
+
+# Test specific provider
+python scripts/test_cross_encoder.py --provider openai
+python scripts/test_cross_encoder.py --provider jina
+
+# Compare both providers
+python scripts/test_cross_encoder.py --compare
 ```
 
 ## Current Development Focus

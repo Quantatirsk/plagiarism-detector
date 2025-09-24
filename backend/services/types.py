@@ -33,7 +33,6 @@ class EvidencePayload:
 
     candidate_id: int
     semantic_score: Optional[float]
-    lexical_overlap: Optional[float]
     alignment_ratio: Optional[float]
     final_score: Optional[float]
     extra_json: Optional[dict] = None

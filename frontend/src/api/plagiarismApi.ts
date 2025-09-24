@@ -74,7 +74,6 @@ export interface MatchGroupModel {
   right_chunk_id: number;
   final_score: number | null;
   semantic_score: number | null;
-  lexical_overlap: number | null;
   cross_score: number | null;
   alignment_ratio: number | null;
   span_count: number;
@@ -89,7 +88,6 @@ export interface MatchDetailModel {
   right_chunk_id: number;
   final_score: number | null;
   semantic_score: number | null;
-  lexical_overlap: number | null;
   cross_score: number | null;
   spans?: SpanJson[] | null;
 }
@@ -109,18 +107,57 @@ export interface PairReport {
   details: MatchDetailModel[];
 }
 
-export interface PipelineOptions {
-  lexical_shingle_size?: number;
-  lexical_threshold?: number;
+// Detection modes from backend
+export type DetectionMode = 'pure_semantic' | 'aggressive' | 'fast' | 'strict';
+
+// Simplified options matching backend
+export interface DetectionOptions {
+  mode?: DetectionMode;
   semantic_threshold?: number;
   final_threshold?: number;
   top_k?: number;
-  max_candidates?: number;
-  cross_encoder_top_k?: number;
-  cross_encoder_threshold?: number;
 }
 
+// Pipeline options removed - use detection modes instead
+
 export type ChunkGranularity = 'sentence' | 'paragraph';
+
+// Progress tracking types
+export type ProgressType = 'DOCUMENT_PROCESSING' | 'BATCH_OPERATION' | 'COMPARISON_JOB' | 'COMPARISON_PAIR';
+export type ProgressStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+
+export interface ProgressTask {
+  task_id: string;
+  task_type: ProgressType;
+  description: string;
+  status: ProgressStatus;
+  total_steps?: number;
+  current_step: number;
+  progress_percent: number;
+  parent_id?: string;
+  metadata: Record<string, unknown>;
+  created_at?: string;
+  started_at?: string;
+  completed_at?: string;
+  error_message?: string;
+  current_message?: string;
+  sub_tasks: string[];
+  duration_seconds?: number;
+  items_per_second?: number;
+  estimated_seconds_remaining?: number;
+}
+
+export interface UploadTaskResponse {
+  task_id: string;
+  documents: DocumentSummary[];
+  message: string;
+}
+
+export interface ComparisonTaskResponse {
+  task_id: string;
+  job_id?: number;
+  message: string;
+}
 
 // API methods
 export const plagiarismApi = {
@@ -129,9 +166,9 @@ export const plagiarismApi = {
     return response.data;
   },
 
-  async uploadDocuments(projectId: number, files: File[], source?: string): Promise<DocumentSummary[]> {
+  async uploadDocuments(projectId: number, files: File[], source?: string): Promise<UploadTaskResponse> {
     if (!files.length) {
-      return [];
+      throw new Error('No files provided');
     }
     const formData = new FormData();
     files.forEach((file) => {
@@ -141,7 +178,7 @@ export const plagiarismApi = {
     if (source) {
       formData.append('source', source);
     }
-    const response = await apiClient.post<{ items: DocumentSummary[] }>(
+    const response = await apiClient.post<UploadTaskResponse>(
       '/api/v1/documents',
       formData,
       {
@@ -150,7 +187,7 @@ export const plagiarismApi = {
         },
       }
     );
-    return response.data.items;
+    return response.data;
   },
 
   async listDocuments(options?: { status?: DocumentStatus; projectId?: number }): Promise<DocumentSummary[]> {
@@ -202,12 +239,24 @@ export const plagiarismApi = {
   async createPairs(
     jobId: number,
     pairs: Array<{ left_document_id: number; right_document_id: number }>,
-    options?: { execute?: boolean; pipeline?: PipelineOptions; granularity?: ChunkGranularity }
+    options?: {
+      execute?: boolean;
+      mode?: DetectionMode;
+      semantic_threshold?: number;
+      final_threshold?: number;
+      top_k?: number;
+      // No pipeline support - use mode instead
+      granularity?: ChunkGranularity
+    }
   ): Promise<ComparePairSummary[]> {
     const payload = {
       pairs,
       execute: options?.execute ?? true,
-      pipeline: options?.pipeline,
+      mode: options?.mode ?? 'aggressive', // Default to aggressive mode
+      semantic_threshold: options?.semantic_threshold,
+      final_threshold: options?.final_threshold,
+      top_k: options?.top_k,
+      // No pipeline support
       granularity: options?.granularity ?? 'paragraph',
     };
     const response = await apiClient.post<{ items: ComparePairSummary[] }>(
@@ -245,8 +294,8 @@ export const plagiarismApi = {
     return response.data.items;
   },
 
-  async runProjectComparisons(projectId: number): Promise<CompareJobSummary> {
-    const response = await apiClient.post<CompareJobSummary>(
+  async runProjectComparisons(projectId: number): Promise<ComparisonTaskResponse> {
+    const response = await apiClient.post<ComparisonTaskResponse>(
       `/api/v1/projects/${projectId}/run-comparisons`
     );
     return response.data;
@@ -260,6 +309,35 @@ export const plagiarismApi = {
   async getPairReport(pairId: number): Promise<PairReport> {
     const response = await apiClient.get<PairReport>(`/api/v1/compare-jobs/pairs/${pairId}`);
     return response.data;
+  },
+
+  // Progress tracking methods
+  async getProgressTask(taskId: string): Promise<ProgressTask> {
+    const response = await apiClient.get<ProgressTask>(`/api/v1/progress/tasks/${taskId}`);
+    return response.data;
+  },
+
+  async getActiveProgressTasks(): Promise<ProgressTask[]> {
+    const response = await apiClient.get<ProgressTask[]>('/api/v1/progress/active');
+    return response.data;
+  },
+
+  async getProgressSubtasks(taskId: string): Promise<ProgressTask[]> {
+    const response = await apiClient.get<ProgressTask[]>(`/api/v1/progress/tasks/${taskId}/subtasks`);
+    return response.data;
+  },
+
+  async cancelProgressTask(taskId: string): Promise<{ status: string; task_id: string }> {
+    const response = await apiClient.post<{ status: string; task_id: string }>(`/api/v1/progress/tasks/${taskId}/cancel`);
+    return response.data;
+  },
+
+  // Server-Sent Events for real-time progress
+  createProgressEventSource(taskId?: string): EventSource {
+    const url = taskId
+      ? `${API_BASE_URL}/api/v1/progress/stream?task_id=${taskId}`
+      : `${API_BASE_URL}/api/v1/progress/stream`;
+    return new EventSource(url);
   },
 };
 

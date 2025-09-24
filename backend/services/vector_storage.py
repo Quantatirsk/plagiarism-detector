@@ -1,7 +1,7 @@
 """
 Milvus向量存储服务 - 支持本地和服务器两种模式
 """
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 from backend.core.config import MilvusMode
 from backend.core.errors import StorageError
 from backend.services.base_service import BaseService, singleton

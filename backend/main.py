@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from backend.api.v1 import health, documents, compare, projects
+from backend.api.v1 import health, documents, compare, projects, metrics, progress
 from backend.core.config import get_settings
 from backend.core.middleware import error_handler
 from backend.db import init_db
@@ -86,6 +86,8 @@ app.include_router(
 app.include_router(documents.router)
 app.include_router(compare.router)
 app.include_router(projects.router)
+app.include_router(metrics.router)
+app.include_router(progress.router)
 
 # Prometheus监控
 Instrumentator().instrument(app).expose(app)
@@ -111,6 +113,7 @@ async def api_root():
             "projects": "/api/v1/projects",
             "documents": "/api/v1/documents",
             "compare_jobs": "/api/v1/compare-jobs",
+            "progress": "/api/v1/progress",
         }
     }
 

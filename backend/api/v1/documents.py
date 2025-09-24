@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status, Response
 from pydantic import BaseModel
 
 from backend.core.logging import get_logger
@@ -98,13 +98,20 @@ class UploadResponse(BaseModel):
     items: List[DocumentSummary]
 
 
-@router.post("", response_model=UploadResponse, summary="Upload one or more documents")
+class UploadTaskResponse(BaseModel):
+    task_id: str
+    documents: List[DocumentSummary]
+    message: str = "Documents uploaded and processing started"
+
+
+@router.post("", response_model=UploadTaskResponse, summary="Upload one or more documents")
 async def upload_documents(
+    background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(..., description="Documents to ingest"),
     project_id: int = Form(..., description="Project identifier"),
     source: Optional[str] = Form(None),
     orchestrator: DetectionOrchestrator = Depends(_orchestrator),
-) -> UploadResponse:
+) -> UploadTaskResponse:
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
@@ -112,33 +119,112 @@ async def upload_documents(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    # Create a parent progress task for batch upload
+    from backend.services.progress_tracker import ProgressTracker, ProgressType
+    progress_tracker = ProgressTracker()
+
+    batch_task_id = progress_tracker.create_task(
+        task_type=ProgressType.BATCH_PROCESSING,
+        description=f"正在上传 {len(files)} 个文档到项目 {project_id}",
+        total_steps=len(files),
+        metadata={"project_id": project_id, "file_count": len(files)}
+    )
+
+    # Save uploaded files first and create placeholder documents
     temp_paths: List[str] = []
-    results: List[DocumentSummary] = []
+    placeholder_docs: List[DocumentSummary] = []
+
     try:
         for index, upload in enumerate(files):
             temp_path = await _save_upload(upload, f"doc{index}")
             temp_paths.append(temp_path)
 
-            try:
-                uploaded = await orchestrator.ingest_file(
-                    temp_path,
+            # Create placeholder document
+            from backend.db.models import Document
+            from backend.db import get_session
+            import hashlib
+
+            # Generate a temporary checksum for the placeholder
+            temp_checksum = hashlib.sha256(f"{upload.filename}_{index}_{project_id}".encode()).hexdigest()
+
+            async with get_session() as session:
+                doc = Document(
                     project_id=project_id,
                     title=Path(upload.filename or '').stem,
+                    filename=upload.filename,
                     source=source,
+                    checksum=temp_checksum,  # Will be updated after processing
+                    status=DocumentStatus.PENDING,
+                    paragraph_count=0,
+                    sentence_count=0,
+                    char_count=0,
                 )
-                results.append(DocumentSummary.from_model(uploaded.document))
-            except Exception as exc:
-                logger.error("Document ingestion failed", filename=upload.filename, error=str(exc))
-                raise HTTPException(status_code=500, detail=f"Failed to ingest {upload.filename}: {exc}")
-    finally:
+                session.add(doc)
+                await session.commit()
+                await session.refresh(doc)
+                placeholder_docs.append(DocumentSummary.from_model(doc))
+
+        # Process documents asynchronously
+        async def process_documents():
+            await progress_tracker.start_task(batch_task_id)
+            results = []
+
+            for index, (temp_path, placeholder) in enumerate(zip(temp_paths, placeholder_docs)):
+                try:
+                    # Update parent task progress
+                    await progress_tracker.update_progress(
+                        batch_task_id,
+                        current_step=index,
+                        message=f"正在处理文档 {index + 1}/{len(files)}: {placeholder.filename}"
+                    )
+
+                    # Update placeholder to processing status
+                    await orchestrator.mark_document_status(placeholder.id, status=DocumentStatus.PROCESSING)
+
+                    # Process the document for existing placeholder
+                    uploaded = await orchestrator.process_existing_document(
+                        temp_path,
+                        document_id=placeholder.id,
+                        project_id=project_id,
+                    )
+                    results.append(uploaded)
+
+                except Exception as exc:
+                    logger.error("Document ingestion failed",
+                               document_id=placeholder.id,
+                               filename=placeholder.filename,
+                               error=str(exc))
+                    # Mark as failed
+                    await orchestrator.mark_document_status(placeholder.id, status=DocumentStatus.FAILED)
+                finally:
+                    # Cleanup temp file
+                    try:
+                        if Path(temp_path).exists():
+                            os.unlink(temp_path)
+                    except Exception as cleanup_error:
+                        logger.warning("Failed to clean temp file", path=temp_path, error=str(cleanup_error))
+
+            # Complete the batch task
+            await progress_tracker.complete_task(batch_task_id, message=f"成功处理 {len(results)} 个文档")
+            return results
+
+        background_tasks.add_task(process_documents)
+
+    except Exception as e:
+        # Cleanup on immediate failure
         for path in temp_paths:
             try:
                 if Path(path).exists():
                     os.unlink(path)
-            except Exception as cleanup_error:
-                logger.warning("Failed to clean temp file", path=path, error=str(cleanup_error))
+            except Exception:
+                pass
+        raise
 
-    return UploadResponse(items=results)
+    return UploadTaskResponse(
+        task_id=batch_task_id,
+        documents=placeholder_docs,
+        message=f"Uploaded {len(files)} document(s), processing in background"
+    )
 
 
 class DocumentListResponse(BaseModel):

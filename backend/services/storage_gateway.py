@@ -93,7 +93,6 @@ class MatchGroupCreate:
     right_chunk_id: int
     final_score: Optional[float]
     semantic_score: Optional[float]
-    lexical_overlap: Optional[float]
     cross_score: Optional[float]
     alignment_ratio: Optional[float]
     span_count: int
@@ -108,7 +107,6 @@ class MatchDetailCreate:
     right_chunk_id: int
     final_score: Optional[float]
     semantic_score: Optional[float]
-    lexical_overlap: Optional[float]
     cross_score: Optional[float]
     spans: Optional[dict]
     group_id: Optional[int] = None
@@ -188,6 +186,42 @@ class StorageGateway(BaseService):
             if error_message is not None:
                 document.error_message = error_message
             await session.flush()
+            return document
+
+    async def update_document(
+        self,
+        document_id: int,
+        *,
+        checksum: Optional[str] = None,
+        processed_text: Optional[str] = None,
+        language: Optional[str] = None,
+        char_count: Optional[int] = None,
+        filename: Optional[str] = None,
+        storage_path: Optional[str] = None,
+    ) -> Document:
+        """Update document with parsed information."""
+        async with get_session() as session:
+            document = await session.get(Document, document_id)
+            if not document:
+                raise NoResultFound(f"Document {document_id} not found")
+
+            if checksum is not None:
+                document.checksum = checksum
+            if processed_text is not None:
+                document.processed_text = processed_text
+            if language is not None:
+                document.language = language
+            if char_count is not None:
+                document.char_count = char_count
+            if filename is not None:
+                document.filename = filename
+            if storage_path is not None:
+                document.storage_path = storage_path
+
+            document.updated_at = datetime.utcnow()
+
+            await session.commit()
+            await session.refresh(document)
             return document
 
     async def store_chunks(
@@ -309,7 +343,6 @@ class StorageGateway(BaseService):
                     right_chunk_id=entry.right_chunk_id,
                     final_score=entry.final_score,
                     semantic_score=entry.semantic_score,
-                    lexical_overlap=entry.lexical_overlap,
                     cross_score=entry.cross_score,
                     alignment_ratio=entry.alignment_ratio,
                     span_count=entry.span_count,
@@ -336,7 +369,6 @@ class StorageGateway(BaseService):
                     right_chunk_id=entry.right_chunk_id,
                     final_score=entry.final_score,
                     semantic_score=entry.semantic_score,
-                    lexical_overlap=entry.lexical_overlap,
                     cross_score=entry.cross_score,
                     spans_json=entry.spans,
                 )

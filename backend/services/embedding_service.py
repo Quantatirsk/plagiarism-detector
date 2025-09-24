@@ -3,7 +3,7 @@
 """
 import asyncio
 import hashlib
-from typing import List, Optional
+from typing import List, Optional, Callable, Dict, Any
 
 import openai
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -64,12 +64,20 @@ class EmbeddingService(BaseService):
             self.logger.error("Embedding failed", text_length=len(text), error=str(e))
             raise EmbeddingError(f"Failed to embed text: {e}")
     
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
-        """批量嵌入 - 使用asyncio并发处理单个文本嵌入"""
+    async def embed_batch(
+        self,
+        texts: List[str],
+        progress_callback: Optional[Callable[[Dict[str, Any]], Any]] = None,
+        batch_size: Optional[int] = None
+    ) -> List[List[float]]:
+        """批量嵌入 - 支持进度回调的批次处理"""
         import asyncio
         self._ensure_initialized()
         local_cache: dict[str, List[float]] = {}
-        
+
+        # 使用配置的批次大小或默认值
+        batch_size = batch_size or self.batch_size or 10
+
         async def embed_single_safe(text: str) -> List[float]:
             """安全的单文本嵌入，失败时返回零向量"""
             cache_key = self._cache_key(text)
@@ -83,11 +91,32 @@ class EmbeddingService(BaseService):
                 self.logger.error("Single embedding failed", text_length=len(text), error=str(e))
                 return [0.0] * self.dimensions
 
-        # 使用asyncio.gather并发处理所有文本
-        self.logger.info(f"Starting batch embedding for {len(texts)} texts")
-        embeddings = await asyncio.gather(*[embed_single_safe(text) for text in texts])
+        self.logger.info(f"Starting batch embedding for {len(texts)} texts with batch size {batch_size}")
+        embeddings = []
+        total_texts = len(texts)
 
-        self.logger.info(f"Batch embedding completed: {len(embeddings)} embeddings generated (concurrent processing)")
+        # 分批处理
+        for i in range(0, total_texts, batch_size):
+            batch = texts[i:i + batch_size]
+            batch_end = min(i + batch_size, total_texts)
+
+            # 处理当前批次
+            batch_embeddings = await asyncio.gather(*[embed_single_safe(text) for text in batch])
+            embeddings.extend(batch_embeddings)
+
+            # 调用进度回调
+            if progress_callback:
+                progress_info = {
+                    "current": batch_end,
+                    "total": total_texts,
+                    "percent": (batch_end / total_texts) * 100,
+                    "message": f"已生成 {batch_end}/{total_texts} 个嵌入向量"
+                }
+                await progress_callback(progress_info)
+
+            self.logger.debug(f"Processed batch {i//batch_size + 1}, completed {batch_end}/{total_texts} embeddings")
+
+        self.logger.info(f"Batch embedding completed: {len(embeddings)} embeddings generated")
         return embeddings
 
     def _cache_key(self, text: str) -> str:
