@@ -86,6 +86,12 @@ class Settings(BaseSettings):
     top_k_paragraphs: int = Field(default=50, description="返回top-k个相似段落")
     max_total_matches: int = Field(default=2000, description="一次检测返回的最大匹配总数上限")
 
+    # LLM 配置
+    llm_model: str = Field(
+        default="google/gemini-2.5-flash-lite",
+        description="LLM模型 (使用OpenAI配置)",
+    )
+
     # CORS 配置
     # 以逗号分隔的允许来源列表，例如："http://localhost:5173,https://your.app"
     cors_allow_origins: str = Field(default="http://localhost:5173", description="允许的跨域来源，逗号分隔")

@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from backend.services.health_service import HealthService
     from backend.services.detection_orchestrator import DetectionOrchestrator
     from backend.services.comparison_service import ComparisonService
+    from backend.services.llm_service import LLMService
+    from backend.services.report_generator_service import ReportGeneratorService
 
 
 class ServiceFactory:
@@ -64,3 +66,15 @@ class ServiceFactory:
         """获取对比执行服务"""
         from backend.services.comparison_service import ComparisonService
         return ComparisonService()
+
+    @staticmethod
+    def get_llm_service() -> 'LLMService':
+        """获取LLM服务"""
+        from backend.services.llm_service import LLMService
+        return LLMService()
+
+    @staticmethod
+    def get_report_generator() -> 'ReportGeneratorService':
+        """获取报告生成服务"""
+        from backend.services.report_generator_service import ReportGeneratorService
+        return ReportGeneratorService()

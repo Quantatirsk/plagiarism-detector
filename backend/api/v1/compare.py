@@ -231,6 +231,8 @@ class MatchDetailModel(BaseModel):
     semantic_score: Optional[float]
     cross_score: Optional[float]
     spans: Optional[List[dict]]
+    left_excerpt: Optional[str] = None
+    right_excerpt: Optional[str] = None
 
 
 class PairReportResponse(BaseModel):

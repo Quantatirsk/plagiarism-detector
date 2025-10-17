@@ -25,7 +25,7 @@ class CrossEncoderService(BaseService):
         self.provider = self.settings.reranker_provider.lower()
 
         if self.provider == "jina":
-            # Initialize Jina provider
+            # Initialize Jina provider (using custom implementation to fix pymilvus bug)
             self.model = self.settings.cross_encoder_model
             self.api_key = self.settings.jina_api_key
 
@@ -33,14 +33,13 @@ class CrossEncoderService(BaseService):
                 raise ValueError("Jina API key is required for cross-encoder service")
 
             try:
-                from pymilvus.model.reranker import JinaRerankFunction
+                # Use custom JinaRerankFunction that fixes pymilvus parsing bug
+                from backend.services.jina_reranker import JinaRerankFunction
                 self._reranker = JinaRerankFunction(
                     model_name=self.model,
                     api_key=self.api_key,
                 )
-                self.logger.info(f"Initialized Jina reranker with model: {self.model}")
-            except ImportError:
-                raise ImportError("pymilvus[model] is required for Jina cross-encoder service")
+                self.logger.info(f"Initialized Jina reranker with model: {self.model} (custom implementation)")
             except Exception as exc:
                 self.logger.error("Failed to initialize Jina reranker", error=str(exc))
                 raise

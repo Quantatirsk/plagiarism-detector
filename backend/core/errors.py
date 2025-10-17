@@ -14,16 +14,17 @@ class ErrorCode(str, Enum):
     INVALID_INPUT = "INVALID_INPUT"
     RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND"
     DUPLICATE_RESOURCE = "DUPLICATE_RESOURCE"
-    
+
     # 服务端错误
     INTERNAL_ERROR = "INTERNAL_ERROR"
     SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
-    
+
     # 外部服务错误
     OPENAI_ERROR = "OPENAI_ERROR"
     MILVUS_ERROR = "MILVUS_ERROR"
     REDIS_ERROR = "REDIS_ERROR"
-    
+    LLM_ERROR = "LLM_ERROR"
+
     # 业务逻辑错误
     DETECTION_FAILED = "DETECTION_FAILED"
     EMBEDDING_FAILED = "EMBEDDING_FAILED"
@@ -181,12 +182,29 @@ class RedisError(BaseApplicationError):
         details = {}
         if operation:
             details["operation"] = operation
-        
+
         super().__init__(
             message=f"Redis error: {message}",
             error_code=ErrorCode.REDIS_ERROR,
             details=details,
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+class LLMError(BaseApplicationError):
+    """LLM服务错误"""
+    def __init__(self, message: str, model: Optional[str] = None, api_error: Optional[Exception] = None):
+        details = {}
+        if model:
+            details["model"] = model
+        if api_error:
+            details["original_error"] = str(api_error)
+
+        super().__init__(
+            message=f"LLM service error: {message}",
+            error_code=ErrorCode.LLM_ERROR,
+            details=details,
+            status_code=status.HTTP_502_BAD_GATEWAY
         )
 
 

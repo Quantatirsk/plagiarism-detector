@@ -9,15 +9,17 @@ import { ProjectsPage } from '@/pages/ProjectsPage';
 import { ProjectDetailPanel } from '@/pages/ProjectDetailPanel';
 import { ProjectJobPanel } from '@/pages/ProjectJobPanel';
 import { PlanComparePage } from '@/pages/PlanComparePage';
+import { ReportsPage } from '@/pages/ReportsPage';
 import { useDocuments, useJobPairs, usePairReport, useDocumentDetail } from '@/hooks/useData';
 import { useCachedPairData } from '@/hooks/useCachedPairData';
 import { Button } from '@/components/ui/button';
 
 function App() {
-  const [view, setView] = useState<'projects' | 'project' | 'job' | 'pair'>('projects');
+  const [view, setView] = useState<'projects' | 'project' | 'job' | 'pair' | 'reports'>('projects');
   const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null);
   const [selectedJob, setSelectedJob] = useState<CompareJobSummary | null>(null);
   const [selectedPair, setSelectedPair] = useState<ComparePairSummary | null>(null);
+  const [reportMode, setReportMode] = useState<'project' | 'job' | 'document'>('project');
 
   const projectDocumentsState = useDocuments(selectedProject ? { projectId: selectedProject.id } : undefined);
   const projectDocuments = projectDocumentsState.data ?? [];
@@ -130,6 +132,10 @@ function App() {
         pairsError={jobPairsState.error}
         onReloadPairs={jobPairsState.reload}
         documentLookup={documentLookup}
+        onOpenReports={() => {
+          setReportMode('job');
+          setView('reports');
+        }}
       />
     );
   }
@@ -144,17 +150,16 @@ function App() {
           pairs={jobPairs}
           pairsLoading={jobPairsState.loading}
           pairsError={jobPairsState.error}
-          documentLookup={documentLookup}
-          onSwitchPair={(pairId) => {
-            const next = jobPairs.find((pair) => pair.id === pairId);
-            if (next) {
-              setSelectedPair(next);
-            }
-          }}
-          onReloadPairs={jobPairsState.reload}
-          onBack={() => setView('job')}
-          isTransitioning={true}
-        />
+        documentLookup={documentLookup}
+        onSwitchPair={(pairId) => {
+          const next = jobPairs.find((pair) => pair.id === pairId);
+          if (next) {
+            setSelectedPair(next);
+          }
+        }}
+        onBack={() => setView('job')}
+        isTransitioning={true}
+      />
       );
     }
 
@@ -184,9 +189,50 @@ function App() {
             setSelectedPair(next);
           }
         }}
-        onReloadPairs={jobPairsState.reload}
         onBack={() => setView('job')}
         isTransitioning={false}
+      />
+    );
+  }
+
+  // Reports view
+  if (view === 'reports') {
+    // Prepare available documents and projects data
+    const sortedDocuments = [...projectDocuments].sort((a, b) => {
+      const aTime = new Date(a.created_at).getTime();
+      const bTime = new Date(b.created_at).getTime();
+      return aTime - bTime;
+    });
+
+    const availableDocuments = sortedDocuments.map(doc => ({
+      id: doc.id.toString(),
+      title: doc.title || doc.filename || `文档 ${doc.id}`
+    }));
+
+    const availableProjects = selectedProject ? [{
+      id: selectedProject.id.toString(),
+      name: selectedProject.name
+    }] : [];
+
+    // Determine navigation context based on report mode
+    const handleBack = () => {
+      if (reportMode === 'project' && selectedProject) {
+        setView('project');
+      } else if (reportMode === 'job' && selectedJob) {
+        setView('job');
+      } else {
+        setView('projects');
+      }
+    };
+
+    return (
+      <ReportsPage
+        mode={reportMode}
+        project={selectedProject || undefined}
+        job={selectedJob || undefined}
+        availableDocuments={availableDocuments}
+        availableProjects={availableProjects}
+        onBack={handleBack}
       />
     );
   }

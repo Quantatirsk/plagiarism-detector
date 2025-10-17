@@ -4,6 +4,7 @@ from backend.services.embedding_service import EmbeddingService
 from backend.services.vector_storage import MilvusStorage
 from backend.services.text_processor import TextProcessor
 from backend.services.health_service import HealthService
+from backend.services.llm_service import LLMService
 from backend.repositories.redis import RedisCache
 from fastapi import Depends
 
@@ -35,3 +36,7 @@ def get_health_service(
 def get_detection_service():
     """获取检测编排服务单例"""
     return ServiceFactory.get_detection_orchestrator()
+
+def get_llm_service() -> LLMService:
+    """获取LLM服务单例"""
+    return ServiceFactory.get_llm_service()

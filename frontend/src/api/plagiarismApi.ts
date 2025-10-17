@@ -90,6 +90,8 @@ export interface MatchDetailModel {
   semantic_score: number | null;
   cross_score: number | null;
   spans?: SpanJson[] | null;
+  left_excerpt?: string | null;
+  right_excerpt?: string | null;
 }
 
 export interface SpanJson {
@@ -105,6 +107,21 @@ export interface PairReport {
   right_document_id: number;
   groups: MatchGroupModel[];
   details: MatchDetailModel[];
+}
+
+export interface LLMModelInfo {
+  id: string;
+  object: string;
+  created: number;
+  owned_by: string;
+  permission: unknown[];
+  root: string;
+  parent: string | null;
+}
+
+interface LLMModelsResponse {
+  object: string;
+  data: LLMModelInfo[];
 }
 
 // Detection modes from backend
@@ -309,6 +326,11 @@ export const plagiarismApi = {
   async getPairReport(pairId: number): Promise<PairReport> {
     const response = await apiClient.get<PairReport>(`/api/v1/compare-jobs/pairs/${pairId}`);
     return response.data;
+  },
+
+  async listLLMModels(): Promise<LLMModelInfo[]> {
+    const response = await apiClient.get<LLMModelsResponse>('/api/v1/llm/models');
+    return response.data.data;
   },
 
   // Progress tracking methods

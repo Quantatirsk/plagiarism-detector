@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MatchInfoTooltip } from '@/components/ui/match-info-popover';
 import { cn } from '@/lib/utils';
 import { buildSegmentsWithOverlap, type HighlightInterval as ImportedHighlightInterval } from '@/utils/highlightUtilsSimple';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { saveAs } from 'file-saver';
 
 type Side = 'left' | 'right';
 type DocumentLookup = Record<number, DocumentSummary>;
@@ -28,7 +29,6 @@ interface PairComparePageProps {
   pairsError: string | null;
   documentLookup: DocumentLookup;
   onSwitchPair: (pairId: number) => void;
-  onReloadPairs: () => void;
   onBack: () => void;
   isTransitioning?: boolean;
 }
@@ -65,7 +65,6 @@ export function PlanComparePage({
   pairsError,
   documentLookup,
   onSwitchPair,
-  onReloadPairs,
   onBack,
   isTransitioning = false,
 }: PairComparePageProps) {
@@ -188,6 +187,25 @@ export function PlanComparePage({
     [jumpToMatch],
   );
 
+  const handleDownloadComparison = useCallback(() => {
+    if (!report) {
+      return;
+    }
+
+    const markdown = generateComparisonMarkdown({
+      report,
+      matches,
+      pair: currentPair,
+      documentLookup,
+      leftDocument,
+      rightDocument,
+    });
+
+    const filename = `comparison-${report.pair.id}.md`;
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+    saveAs(blob, filename);
+  }, [report, matches, currentPair, documentLookup, leftDocument, rightDocument]);
+
   if (!report) {
     return (
       <PageShell>
@@ -221,7 +239,16 @@ export function PlanComparePage({
           </>
         }
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={handleDownloadComparison}
+              disabled={!report}
+            >
+              <Download className="mr-2 h-4 w-4" /> 下载对比结果
+            </Button>
             <PairSwitcher
               pairs={pairOptions}
               currentPair={currentPair}
@@ -231,23 +258,7 @@ export function PlanComparePage({
               currentLeftDocument={leftDocument}
               currentRightDocument={rightDocument}
               onSwitchPair={onSwitchPair}
-              onReloadPairs={onReloadPairs}
             />
-            <div className="h-9 w-px bg-border" />
-            <Button
-              variant="outline"
-              size="sm"
-              className="hover:bg-primary/10 hover:text-primary hover:border-primary"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              title={sidebarCollapsed ? '展开匹配列表' : '折叠匹配列表'}
-            >
-              {sidebarCollapsed ? (
-                <ChevronLeft className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-              <span className="sr-only">{sidebarCollapsed ? '展开' : '折叠'}侧边栏</span>
-            </Button>
           </div>
         }
       />
@@ -282,21 +293,26 @@ export function PlanComparePage({
           </div>
         </main>
         <aside className={cn(
-          "flex flex-col border-l border-border bg-card shadow-sm transition-all duration-300 relative",
-          sidebarCollapsed ? "w-0 overflow-hidden" : "w-72 min-w-[18rem]"
+          "relative flex flex-col border-l border-border bg-card shadow-sm transition-all duration-300",
+          sidebarCollapsed ? "w-0 max-w-0" : "w-72 min-w-[18rem]"
         )}>
-            <div className={cn(
-              "flex items-center justify-between border-b border-border px-4 py-3 flex-shrink-0",
-              sidebarCollapsed && "px-0 justify-center"
-            )}>
-              {!sidebarCollapsed && (
-                <>
-                  <h2 className="text-sm font-medium text-muted-foreground">匹配列表</h2>
-                  <span className="text-xs text-muted-foreground">{matches.length}</span>
-                </>
-              )}
-            </div>
-            {!sidebarCollapsed && (
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className={cn(
+              'absolute left-0 top-1/2 z-20 inline-flex h-12 w-5 -translate-y-1/2 -translate-x-full items-center justify-center rounded-md border border-border bg-background shadow-lg transition hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary/40'
+            )}
+            title={sidebarCollapsed ? '展开匹配列表' : '折叠匹配列表'}
+          >
+            {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            <span className="sr-only">{sidebarCollapsed ? '展开' : '折叠'}匹配列表</span>
+          </button>
+          {!sidebarCollapsed && (
+            <>
+              <div className="flex items-center justify-between border-b border-border px-4 py-3 flex-shrink-0">
+                <h2 className="text-sm font-medium text-muted-foreground">匹配列表</h2>
+                <span className="text-xs text-muted-foreground">{matches.length}</span>
+              </div>
               <div className="flex-1 min-h-0 overflow-auto">
                 {matches.length === 0 ? (
                   <p className="px-4 py-4 text-sm text-muted-foreground">未发现匹配结果。</p>
@@ -318,7 +334,7 @@ export function PlanComparePage({
                           >
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-medium text-muted-foreground">#{index + 1}</span>
-                              <span className={cn("text-xs font-mono", getScoreColorClasses(group.final_score))}>{formatScore(group.final_score)}</span>
+                              <span className={cn('text-xs font-mono', getScoreColorClasses(group.final_score))}>{formatScore(group.final_score)}</span>
                             </div>
                             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                               <span>语义 {formatScore(group.semantic_score)}</span>
@@ -331,7 +347,8 @@ export function PlanComparePage({
                   </ul>
                 )}
               </div>
-            )}
+            </>
+          )}
         </aside>
       </div>
     </PageShell>
@@ -371,7 +388,6 @@ interface PairSwitcherProps {
   currentLeftDocument: DocumentDetail | null;
   currentRightDocument: DocumentDetail | null;
   onSwitchPair: (pairId: number) => void;
-  onReloadPairs: () => void;
 }
 
 function PairSwitcher({
@@ -383,7 +399,6 @@ function PairSwitcher({
   currentLeftDocument,
   currentRightDocument,
   onSwitchPair,
-  onReloadPairs,
 }: PairSwitcherProps) {
   const [leftSelection, setLeftSelection] = useState<number>(currentPair.left_document_id);
   const [rightSelection, setRightSelection] = useState<number>(currentPair.id);
@@ -543,18 +558,6 @@ function PairSwitcher({
         >
           <ChevronRight className="h-4 w-4" />
           <span className="sr-only">下一个</span>
-        </Button>
-        <Button
-          variant="default"
-          size="sm"
-          onClick={onReloadPairs}
-          disabled={loading}
-        >
-          {loading ? (
-            <span className="animate-pulse">刷新中...</span>
-          ) : (
-            '刷新'
-          )}
         </Button>
       </div>
     </div>
@@ -735,7 +738,274 @@ function makeHighlightId(side: Side, matchKey: string, ordinal: number) {
   return `${side}-match-${matchKey}-${ordinal}`;
 }
 
-// 删除了 clampNumber 函数 - 不再需要
+function formatMetricTitle(key: string): string {
+  return key
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function formatMetricValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '—';
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value.toFixed(3);
+  }
+  return String(value);
+}
+
+function formatAverageScore(values: Array<number | null | undefined>): string {
+  const numeric = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  if (!numeric.length) {
+    return '—';
+  }
+  const average = numeric.reduce((sum, value) => sum + value, 0) / numeric.length;
+  return average.toFixed(3);
+}
+
+interface ComparisonMarkdownContext {
+  report: PairReport;
+  matches: NormalisedMatch[];
+  pair: ComparePairSummary | null | undefined;
+  documentLookup: DocumentLookup;
+  leftDocument: DocumentDetail | null;
+  rightDocument: DocumentDetail | null;
+}
+
+function generateComparisonMarkdown({
+  report,
+  matches,
+  pair,
+  documentLookup,
+  leftDocument,
+  rightDocument,
+}: ComparisonMarkdownContext): string {
+  const leftLabel = formatDocumentLabel(report.pair.left_document_id, documentLookup, leftDocument);
+  const rightLabel = formatDocumentLabel(report.pair.right_document_id, documentLookup, rightDocument);
+  const matchGroupCount = matches.length;
+  const detailCount = report.details.length;
+  const metricsEntries = Object.entries(pair?.metrics ?? {}).filter(([, value]) => value !== null && value !== undefined);
+  const sortedMatches = [...matches].sort((a, b) => (b.group.final_score ?? 0) - (a.group.final_score ?? 0));
+  const now = new Date().toLocaleString('zh-CN');
+
+  const warningLines = detailCount > 1000
+    ? ['> ⚠️ 匹配详情数量超过 1000 条，为避免影响分析，仅列出部分关键片段。', '']
+    : [];
+
+  const metricSection = metricsEntries.length
+    ? [
+        '## 指标概览',
+        '| 指标 | 数值 |',
+        '| --- | --- |',
+        ...metricsEntries.map(([key, value]) => `| ${formatMetricTitle(key)} | ${formatMetricValue(value)} |`),
+        '',
+      ]
+    : [];
+
+  const distributionSection = [
+    '## 匹配分布速览',
+    `- 平均 Final 分数：${formatAverageScore(sortedMatches.map((item) => item.group.final_score))}`,
+    `- 最高 Final 分数：${formatScore(sortedMatches[0]?.group.final_score)}`,
+    `- 最低 Final 分数：${formatScore(sortedMatches[sortedMatches.length - 1]?.group.final_score)}`,
+    '',
+  ];
+
+  const detailedTableSection = buildHighSimilarityMarkdownTable({
+    matches: sortedMatches,
+    leftDocument,
+    rightDocument,
+  });
+
+  const lines = [
+    '# 文档对比分析报告',
+    '',
+    '## 基本信息',
+    `- 导出时间：${now}`,
+    `- 对比配对 ID：${report.pair.id}`,
+    `- 左侧文档：${leftLabel} (ID: ${report.pair.left_document_id})`,
+    `- 右侧文档：${rightLabel} (ID: ${report.pair.right_document_id})`,
+    `- 匹配组数量：${matchGroupCount}`,
+    `- 匹配详情数量：${detailCount}`,
+    '',
+    ...warningLines,
+    ...metricSection,
+    ...distributionSection,
+    ...detailedTableSection,
+    '---',
+    '',
+    '（本报告为系统自动生成的结构化对比摘要，可用于归档或人工复核。）',
+    '',
+  ];
+
+  return lines.join('\n');
+}
+
+interface HighSimilarityTableOptions {
+  matches: NormalisedMatch[];
+  leftDocument: DocumentDetail | null;
+  rightDocument: DocumentDetail | null;
+  maxRows?: number;
+}
+
+function buildHighSimilarityMarkdownTable({
+  matches,
+  leftDocument,
+  rightDocument,
+  maxRows = 50,
+}: HighSimilarityTableOptions): string[] {
+  if (!matches.length) {
+    return [];
+  }
+
+  const leftText = leftDocument?.processed_text ?? null;
+  const rightText = rightDocument?.processed_text ?? null;
+
+  const rows: string[] = [];
+  const limited = matches.slice(0, maxRows);
+
+  limited.forEach((match, index) => {
+    const { group, details } = match;
+    const primaryDetail = selectPrimaryDetail(details);
+    const leftExcerpt = resolveExcerpt({
+      detail: primaryDetail,
+      side: 'left',
+      fullText: leftText,
+    });
+    const rightExcerpt = resolveExcerpt({
+      detail: primaryDetail,
+      side: 'right',
+      fullText: rightText,
+    });
+
+    const score = group.final_score ?? 0;
+    const rowStyle = scoreStyleForMarkdown(score);
+
+    rows.push(
+      `<tr style="${rowStyle}">
+        <td style="padding:8px 12px;border:1px solid #d7dce3;vertical-align:top;">${index + 1}</td>
+        <td style="padding:8px 12px;border:1px solid #d7dce3;vertical-align:top;">${formatScore(group.final_score)}</td>
+        <td style="padding:8px 12px;border:1px solid #d7dce3;vertical-align:top;">${escapeHtml(leftExcerpt)}</td>
+        <td style="padding:8px 12px;border:1px solid #d7dce3;vertical-align:top;">${escapeHtml(rightExcerpt)}</td>
+      </tr>`
+    );
+  });
+
+  const table = [
+    '## 高相似片段详情',
+    '<table style="width:100%;border-collapse:collapse;margin-top:12px;">',
+    '<thead>',
+    '<tr style="background:#f4f6fb;color:#1f2937;font-weight:600;">',
+    '<th style="padding:8px 12px;border:1px solid #d7dce3;">序号</th>',
+    '<th style="padding:8px 12px;border:1px solid #d7dce3;">相似度</th>',
+    '<th style="padding:8px 12px;border:1px solid #d7dce3;">左侧片段</th>',
+    '<th style="padding:8px 12px;border:1px solid #d7dce3;">右侧片段</th>',
+    '</tr>',
+    '</thead>',
+    '<tbody>',
+    ...rows,
+    '</tbody>',
+    '</table>',
+    '',
+  ];
+
+  return table;
+}
+
+function selectPrimaryDetail(details: MatchDetailModel[]): MatchDetailModel | undefined {
+  if (!details?.length) {
+    return undefined;
+  }
+  return [...details].sort((a, b) => (b.final_score ?? 0) - (a.final_score ?? 0))[0];
+}
+
+function extractExcerpt(fullText: string, start: number, end: number, radius = 80): string {
+  if (!fullText) {
+    return '—';
+  }
+
+  const safeStart = Number.isFinite(start) ? Math.max(0, Math.min(start, fullText.length)) : 0;
+  const safeEnd = Number.isFinite(end) ? Math.max(safeStart, Math.min(end, fullText.length)) : safeStart;
+
+  const windowStart = Math.max(0, safeStart - radius);
+  const windowEnd = Math.min(fullText.length, safeEnd + radius);
+  let snippet = fullText.slice(windowStart, windowEnd).replace(/\s+/g, ' ').trim();
+
+  if (!snippet) {
+    return '—';
+  }
+
+  if (windowStart > 0) {
+    snippet = `…${snippet}`;
+  }
+  if (windowEnd < fullText.length) {
+    snippet = `${snippet}…`;
+  }
+  return snippet;
+}
+
+function scoreStyleForMarkdown(score: number): string {
+  if (!Number.isFinite(score)) {
+    return 'background:#f8fafc;color:#1f2937;';
+  }
+  if (score >= 0.9) {
+    return 'background:rgba(239,68,68,0.18);color:#7f1d1d;';
+  }
+  if (score >= 0.85) {
+    return 'background:rgba(249,115,22,0.16);color:#7c2d12;';
+  }
+  if (score >= 0.8) {
+    return 'background:rgba(250,204,21,0.14);color:#713f12;';
+  }
+  return 'background:#f8fafc;color:#1f2937;';
+}
+
+interface ResolveExcerptOptions {
+  detail: MatchDetailModel | undefined;
+  side: 'left' | 'right';
+  fullText: string | null;
+  radius?: number;
+}
+
+function resolveExcerpt({ detail, side, fullText, radius = 80 }: ResolveExcerptOptions): string {
+  if (!detail) {
+    return '—';
+  }
+
+  const direct = side === 'left' ? detail.left_excerpt : detail.right_excerpt;
+  if (direct && direct.trim()) {
+    return direct.trim();
+  }
+
+  const spans = detail.spans;
+  if (!Array.isArray(spans) || spans.length === 0) {
+    return '—';
+  }
+  const first = spans[0];
+  const start = side === 'left' ? first.left_start : first.right_start;
+  const end = side === 'left' ? first.left_end : first.right_end;
+
+  if (typeof start !== 'number' || typeof end !== 'number' || end <= start) {
+    return '—';
+  }
+
+  if (!fullText) {
+    return '—';
+  }
+
+  return extractExcerpt(fullText, start, end, radius);
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/\n/g, '<br/>');
+}
 
 function formatDocumentLabel(
   documentId: number,

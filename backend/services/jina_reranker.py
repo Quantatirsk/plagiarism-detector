@@ -1,7 +1,6 @@
-"""OpenAI-compatible reranker implementation."""
+"""Custom Jina AI reranker implementation that fixes pymilvus bug."""
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -21,23 +20,21 @@ class RerankResult:
     document: Optional[dict] = None
 
 
-class OpenAIRerankFunction:
-    """OpenAI-compatible reranker client with synchronous interface."""
+class JinaRerankFunction:
+    """Custom Jina AI reranker client that fixes pymilvus parsing bug."""
 
-    def __init__(self, model_name: str, api_key: str, base_url: str):
-        """Initialize OpenAI reranker.
+    def __init__(self, model_name: str, api_key: str):
+        """Initialize Jina reranker.
 
         Args:
-            model_name: Model identifier for reranking
-            api_key: API key for authentication
-            base_url: Base URL for the API endpoint
+            model_name: Jina model identifier (e.g., 'jina-reranker-v2-base-multilingual')
+            api_key: Jina API key for authentication
         """
         self.model_name = model_name
         self.api_key = api_key
-        self.base_url = base_url.rstrip('/')
-        self.endpoint = f"{self.base_url}/rerank"
+        self.endpoint = "https://api.jina.ai/v1/rerank"
 
-        # Use synchronous HTTP client to avoid event loop issues
+        # Use synchronous HTTP client
         self.client = httpx.Client(
             timeout=httpx.Timeout(30.0),
             headers={
@@ -51,25 +48,25 @@ class OpenAIRerankFunction:
         wait=wait_exponential(multiplier=1, min=1, max=10),
     )
     def _make_request(self, query: str, documents: List[str], top_k: int) -> List[RerankResult]:
-        """Make rerank request to OpenAI-compatible endpoint (synchronous)."""
+        """Make rerank request to Jina API (synchronous)."""
         try:
-            # Build request payload
+            # Build request payload for Jina API
             payload = {
                 "model": self.model_name,
                 "query": query,
                 "documents": documents,
-                "top_n": min(top_k, len(documents)),  # OpenAI uses top_n instead of top_k
+                "top_n": min(top_k, len(documents)),
             }
 
             logger.debug(
-                "Making rerank request",
+                "Making Jina rerank request",
                 model=self.model_name,
                 query_preview=query[:50] + "..." if len(query) > 50 else query,
                 num_docs=len(documents),
                 top_n=payload["top_n"]
             )
 
-            # Make HTTP request (synchronous)
+            # Make HTTP request to Jina API
             response = self.client.post(self.endpoint, json=payload)
             response.raise_for_status()
 
@@ -77,15 +74,42 @@ class OpenAIRerankFunction:
             data = response.json()
             results = []
 
-            for item in data.get("results", []):
-                results.append(RerankResult(
-                    score=float(item.get("relevance_score", 0.0)),
-                    index=int(item.get("index", 0)),
-                    document=item.get("document"),
-                ))
+            # Handle different response formats from Jina API
+            raw_results = data.get("results", [])
+
+            for item in raw_results:
+                # Handle both object and string formats
+                if isinstance(item, dict):
+                    # Standard format: {"document": {"text": "..."}, "relevance_score": 0.9, "index": 0}
+                    doc = item.get("document", {})
+                    if isinstance(doc, dict):
+                        doc_text = doc.get("text", "")
+                    else:
+                        # Fallback: document is a string
+                        doc_text = str(doc)
+
+                    results.append(RerankResult(
+                        score=float(item.get("relevance_score", 0.0)),
+                        index=int(item.get("index", 0)),
+                        document={"text": doc_text} if doc_text else None,
+                    ))
+                elif isinstance(item, str):
+                    # Malformed response: item is a string instead of dict
+                    logger.warning(
+                        "Received string instead of dict in Jina response",
+                        item_preview=item[:100] + "..." if len(item) > 100 else item
+                    )
+                    # Skip this item
+                    continue
+                else:
+                    logger.warning(
+                        "Unexpected item type in Jina response",
+                        item_type=type(item).__name__
+                    )
+                    continue
 
             logger.debug(
-                "Rerank request completed",
+                "Jina rerank request completed",
                 num_results=len(results),
                 scores=[r.score for r in results[:3]],  # Only log first 3 scores
             )
@@ -94,18 +118,18 @@ class OpenAIRerankFunction:
 
         except httpx.HTTPStatusError as e:
             logger.error(
-                "HTTP error in rerank request",
+                "HTTP error in Jina rerank request",
                 status_code=e.response.status_code,
                 detail=e.response.text[:200],  # Truncate error detail
             )
             # Return empty results on error
             return []
         except Exception as e:
-            logger.error("Unexpected error in rerank request", error=str(e))
+            logger.error("Unexpected error in Jina rerank request", error=str(e))
             return []
 
     def __call__(self, query: str, documents: List[str], top_k: int = 1) -> List[RerankResult]:
-        """Synchronous interface matching Jina's API.
+        """Synchronous interface matching pymilvus JinaRerankFunction API.
 
         Args:
             query: Query text to compare against documents

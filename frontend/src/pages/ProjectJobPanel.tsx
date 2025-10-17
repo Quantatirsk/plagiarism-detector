@@ -21,6 +21,7 @@ interface ProjectJobPanelProps {
   pairsError: string | null;
   onReloadPairs: () => void;
   documentLookup?: Record<number, DocumentSummary>;
+  onOpenReports?: () => void;
 }
 
 export function ProjectJobPanel({
@@ -33,6 +34,7 @@ export function ProjectJobPanel({
   pairsError,
   onReloadPairs,
   documentLookup = {},
+  onOpenReports,
 }: ProjectJobPanelProps) {
   const hasActivePairs = useMemo(
     () => pairs.some((pair) => pair.status === 'pending' || pair.status === 'running'),
@@ -60,9 +62,22 @@ export function ProjectJobPanel({
         subtitle={`所属项目：${project.name || `项目 #${project.id}`}`}
         meta={<StatusBadge tone={jobStatusMeta.tone}>{jobStatusMeta.label}</StatusBadge>}
         actions={
-          <Button variant="outline" size="sm" className="hover:bg-primary/10 hover:text-primary hover:border-primary" disabled={pairsLoading} onClick={onReloadPairs}>
-            刷新结果
-          </Button>
+          <div className="flex items-center gap-2">
+            {onOpenReports && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="hover:bg-primary/10 hover:text-primary hover:border-primary"
+                onClick={onOpenReports}
+                disabled={pairs.length === 0}
+              >
+                生成报告
+              </Button>
+            )}
+            <Button variant="outline" size="sm" className="hover:bg-primary/10 hover:text-primary hover:border-primary" disabled={pairsLoading} onClick={onReloadPairs}>
+              刷新结果
+            </Button>
+          </div>
         }
       >
         <div className="flex items-center gap-3 text-xs text-muted-foreground sm:text-sm">
