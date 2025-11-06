@@ -2,7 +2,7 @@
  * ReportGenerator - 报告生成器组件
  * 提供用户界面来配置和生成各类抄袭检测报告
  */
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -202,12 +202,12 @@ export function ReportGenerator({
 
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>报告类型</CardTitle>
-          <CardDescription>选择要生成的报告类型</CardDescription>
+        <CardHeader className="py-3">
+          <CardTitle className="text-base">报告类型</CardTitle>
+          <CardDescription className="text-xs">选择要生成的报告类型</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4">
+        <CardContent className="pb-4">
+          <div className="grid gap-3">
             {types.map((type) => {
               const info = getReportTypeInfo(type);
               const Icon = info.icon;
@@ -217,18 +217,18 @@ export function ReportGenerator({
                 <div
                   key={type}
                   className={cn(
-                    "p-4 border rounded-lg cursor-pointer transition-colors",
+                    "p-3 border rounded-lg cursor-pointer transition-colors",
                     isSelected
                       ? "border-primary bg-primary/5"
                       : "border-border hover:border-primary/50"
                   )}
                   onClick={() => setConfig(prev => ({ ...prev, type }))}
                 >
-                  <div className="flex items-start gap-3">
-                    <Icon className={cn("h-5 w-5 mt-1", info.color)} />
+                  <div className="flex items-start gap-2.5">
+                    <Icon className={cn("h-4 w-4 mt-0.5", info.color)} />
                     <div>
-                      <h4 className="font-medium mb-1">{info.title}</h4>
-                      <p className="text-sm text-muted-foreground">
+                      <h4 className="font-medium text-sm mb-0.5">{info.title}</h4>
+                      <p className="text-xs text-muted-foreground">
                         {info.description}
                       </p>
                     </div>
@@ -356,15 +356,15 @@ export function ReportGenerator({
   const renderConfigOptions = () => {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>生成配置</CardTitle>
-          <CardDescription>自定义报告生成选项</CardDescription>
+        <CardHeader className="py-3">
+          <CardTitle className="text-base">生成配置</CardTitle>
+          <CardDescription className="text-xs">自定义报告生成选项</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 pb-4">
           {renderTargetSelector()}
 
-          <div className="space-y-2">
-            <Label htmlFor="language">报告语言</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="language" className="text-xs">报告语言</Label>
             <Select
               value={config.language}
               onValueChange={(value: 'zh' | 'en') => setConfig(prev => ({ ...prev, language: value }))}
@@ -380,8 +380,8 @@ export function ReportGenerator({
           </div>
 
           {availableModels.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="llm_model">LLM 模型（可选）</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="llm_model" className="text-xs">LLM 模型（可选）</Label>
               <Select
                 value={config.llm_model || ''}
                 onValueChange={(value) => setConfig(prev => ({
@@ -403,8 +403,8 @@ export function ReportGenerator({
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="max_matches_detail">最大匹配详情数量</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="max_matches_detail" className="text-xs">最大匹配详情数量</Label>
             <Input
               id="max_matches_detail"
               type="number"
@@ -422,11 +422,11 @@ export function ReportGenerator({
             )}
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label>包含图表</Label>
-                <p className="text-sm text-muted-foreground">
+              <div className="space-y-0.5">
+                <Label className="text-xs">包含图表</Label>
+                <p className="text-[11px] text-muted-foreground">
                   在报告中包含数据可视化图表
                 </p>
               </div>
@@ -440,9 +440,9 @@ export function ReportGenerator({
             </div>
 
             <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label>包含建议</Label>
-                <p className="text-sm text-muted-foreground">
+              <div className="space-y-0.5">
+                <Label className="text-xs">包含建议</Label>
+                <p className="text-[11px] text-muted-foreground">
                   在报告中包含改进建议和行动计划
                 </p>
               </div>
@@ -456,9 +456,9 @@ export function ReportGenerator({
             </div>
 
             <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label>流式响应</Label>
-                <p className="text-sm text-muted-foreground">
+              <div className="space-y-0.5">
+                <Label className="text-xs">流式响应</Label>
+                <p className="text-[11px] text-muted-foreground">
                   实时显示生成过程，更快看到结果
                 </p>
               </div>
@@ -473,9 +473,9 @@ export function ReportGenerator({
 
             {config.type === 'project' && (
               <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label>包含网络图</Label>
-                  <p className="text-sm text-muted-foreground">
+                <div className="space-y-0.5">
+                  <Label className="text-xs">包含网络图</Label>
+                  <p className="text-[11px] text-muted-foreground">
                     显示文档间的相似性关系网络
                   </p>
                 </div>
@@ -495,35 +495,36 @@ export function ReportGenerator({
   };
 
   return (
-    <div className={cn("space-y-6", className)}>
+    <div className={cn("space-y-4", className)}>
       {renderReportTypeSelector()}
       {renderConfigOptions()}
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Info className="h-4 w-4" />
+      <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5" />
           <span>报告生成通常需要 1-3 分钟完成</span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {onCancel && (
-            <Button variant="outline" onClick={onCancel} disabled={isGenerating}>
+            <Button variant="outline" size="sm" onClick={onCancel} disabled={isGenerating} className="h-7 text-xs">
               取消
             </Button>
           )}
           <Button
             onClick={handleGenerate}
             disabled={isGenerating}
-            className="min-w-[120px]"
+            className="min-w-[100px] h-7 text-xs"
+            size="sm"
           >
             {isGenerating ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                 生成中...
               </>
             ) : (
               <>
-                <Play className="h-4 w-4 mr-2" />
+                <Play className="h-3.5 w-3.5 mr-1.5" />
                 生成报告
               </>
             )}
@@ -532,9 +533,9 @@ export function ReportGenerator({
       </div>
 
       {Object.keys(errors).length > 0 && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="py-2">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
+          <AlertDescription className="text-xs">
             请修正表单中的错误后重试
           </AlertDescription>
         </Alert>

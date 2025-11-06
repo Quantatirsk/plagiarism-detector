@@ -62,6 +62,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
 
     return (
       <SyntaxHighlighter
+        // @ts-expect-error - react-syntax-highlighter style type is incompatible with React.CSSProperties
         style={oneLight}
         language={language || 'text'}
         PreTag="div"

@@ -2,12 +2,12 @@
  * ReportsPage - 报告生成和查看页面
  * 集成报告生成器和查看器，支持文档、对比和项目三种报告类型
  */
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageShell, PageHeader, PageContent } from '@/components/layout/Page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ReportGenerator, type ReportConfig } from '@/components/reports/ReportGenerator';
-import { ReportViewer, type ReportData, type ReportProgress } from '@/components/reports/ReportViewer';
+import { ReportViewer, type ReportData, type ReportProgress, type ReportContent } from '@/components/reports/ReportViewer';
 import { FileText, ArrowLeft, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getApiUrl } from '@/config';
@@ -28,7 +28,7 @@ export function ReportsPage({
   mode,
   project,
   job,
-  document,
+  document: documentProp,
   availableDocuments = [],
   availableProjects = [],
   onBack,
@@ -90,7 +90,7 @@ export function ReportsPage({
         };
       case 'document':
         return {
-          title: `${document?.title || '文档'} - 生成报告`,
+          title: `${documentProp?.title || '文档'} - 生成报告`,
           description: '为单个文档生成抄袭检测报告',
           icon: FileText,
           badge: '文档报告'
@@ -116,21 +116,34 @@ export function ReportsPage({
   const handleGenerate = async (config: ReportConfig) => {
     const taskId = `task_${Date.now()}`;
 
-    const normalizeReport = (raw: any): ReportData => ({
-      id: raw.id,
-      type: raw.type,
-      title: raw.title,
-      summary: raw.summary,
-      content: raw.content ?? {},
-      data: raw.data,
-      generated_at: typeof raw.generated_at === 'string'
-        ? raw.generated_at
-        : raw.generated_at
-          ? new Date(raw.generated_at).toISOString()
-          : new Date().toISOString(),
-      language: raw.language || 'zh',
-      export_formats: raw.export_formats ?? ['html', 'pdf', 'json']
-    });
+    const normalizeReport = (raw: unknown): ReportData => {
+      // Type narrowing for unknown input
+      if (!raw || typeof raw !== 'object') {
+        throw new Error('Invalid report data: not an object');
+      }
+
+      const data = raw as Record<string, unknown>;
+
+      return {
+        id: typeof data.id === 'string' ? data.id : '',
+        type: (data.type === 'document' || data.type === 'comparison' || data.type === 'project')
+          ? data.type
+          : 'document',
+        title: typeof data.title === 'string' ? data.title : '',
+        summary: typeof data.summary === 'string' ? data.summary : '',
+        content: (data.content && typeof data.content === 'object') ? data.content as ReportContent : {},
+        data: data.data,
+        generated_at: typeof data.generated_at === 'string'
+          ? data.generated_at
+          : data.generated_at
+            ? new Date(data.generated_at as string | number).toISOString()
+            : new Date().toISOString(),
+        language: typeof data.language === 'string' ? data.language : 'zh',
+        export_formats: Array.isArray(data.export_formats)
+          ? (data.export_formats as string[])
+          : ['html', 'pdf', 'json']
+      };
+    };
 
     const updateProgress = (partial: Partial<ReportProgress>) => {
       setReportProgress(prev => {
@@ -330,78 +343,49 @@ export function ReportsPage({
     }
   };
 
-  // 处理重新生成
-  const handleRegenerate = () => {
-    setView('generator');
-    setCurrentReport(null);
-    setReportProgress(null);
-    setIsGenerating(false);
-  };
-
-  // 处理导出
-  const handleExport = (format: string) => {
-    if (!currentReport) return;
-
-    // 创建下载链接
-    const content = format === 'json'
-      ? JSON.stringify(currentReport, null, 2)
-      : currentReport.content.full_content || currentReport.summary;
-
-    const blob = new Blob([content], {
-      type: format === 'json' ? 'application/json' : 'text/plain'
-    });
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${currentReport.title}.${format}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   const headerTitle = (
     <div className="flex items-center gap-3">
-      <Button variant="ghost" size="sm" onClick={onBack} className="px-2">
-        <ArrowLeft className="h-4 w-4 mr-2" />
+      <Button variant="ghost" size="sm" onClick={onBack} className="px-2 h-7">
+        <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
         返回
       </Button>
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <Icon className="h-6 w-6 text-primary" />
+      <div className="flex items-center gap-2.5">
+        <div className="p-1.5 rounded-lg bg-primary/10">
+          <Icon className="h-5 w-5 text-primary" />
         </div>
         <div className="flex items-center gap-2 min-w-0">
-          <span className="truncate text-base font-semibold sm:text-lg">{pageInfo.title}</span>
-          <Badge variant="secondary">{pageInfo.badge}</Badge>
+          <span className="truncate text-sm font-semibold sm:text-base">{pageInfo.title}</span>
+          <Badge variant="secondary" className="text-[10px] h-5">{pageInfo.badge}</Badge>
         </div>
       </div>
     </div>
   );
 
   const headerActions = currentReport ? (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5">
       <Button
         variant={view === 'generator' ? 'default' : 'outline'}
         size="sm"
         onClick={() => setView('generator')}
+        className="h-7 text-xs"
       >
-        <Settings className="h-4 w-4 mr-2" />
+        <Settings className="h-3.5 w-3.5 mr-1.5" />
         配置
       </Button>
       <Button
         variant={view === 'viewer' ? 'default' : 'outline'}
         size="sm"
         onClick={() => setView('viewer')}
+        className="h-7 text-xs"
       >
-        <FileText className="h-4 w-4 mr-2" />
+        <FileText className="h-3.5 w-3.5 mr-1.5" />
         查看
       </Button>
     </div>
   ) : null;
 
   return (
-    <PageShell className={cn("space-y-6", className)}>
+    <PageShell className={cn("space-y-4", className)}>
       <PageHeader title={headerTitle} subtitle={pageInfo.description} actions={headerActions} />
 
       <PageContent>
@@ -421,8 +405,6 @@ export function ReportsPage({
             report={currentReport || undefined}
             progress={reportProgress || undefined}
             isGenerating={isGenerating}
-            onRegenerate={handleRegenerate}
-            onExport={handleExport}
           />
         )}
       </PageContent>

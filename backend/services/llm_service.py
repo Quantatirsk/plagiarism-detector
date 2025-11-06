@@ -2,12 +2,8 @@
 LLM服务 - OpenAI兼容的语言模型服务
 用于生成抄袭检测报告和分析
 """
-import asyncio
-import json
 from typing import List, Optional, Dict, Any, AsyncGenerator
-
 import openai
-from openai.types.chat import ChatCompletionMessage
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from backend.core.errors import LLMError
@@ -41,7 +37,7 @@ class LLMService(BaseService):
         max_tokens: Optional[int] = None,
         stream: bool = False,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> Any:
         """
         创建聊天完成请求
 

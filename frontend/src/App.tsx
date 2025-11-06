@@ -10,7 +10,7 @@ import { ProjectDetailPanel } from '@/pages/ProjectDetailPanel';
 import { ProjectJobPanel } from '@/pages/ProjectJobPanel';
 import { PlanComparePage } from '@/pages/PlanComparePage';
 import { ReportsPage } from '@/pages/ReportsPage';
-import { useDocuments, useJobPairs, usePairReport, useDocumentDetail } from '@/hooks/useData';
+import { useDocuments, useJobPairs } from '@/hooks/useData';
 import { useCachedPairData } from '@/hooks/useCachedPairData';
 import { Button } from '@/components/ui/button';
 
@@ -211,7 +211,7 @@ function App() {
 
     const availableProjects = selectedProject ? [{
       id: selectedProject.id.toString(),
-      name: selectedProject.name
+      name: selectedProject.name || `项目 ${selectedProject.id}`
     }] : [];
 
     // Determine navigation context based on report mode

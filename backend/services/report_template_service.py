@@ -21,39 +21,56 @@ class ReportTemplateService(BaseService):
         self.templates["document_zh"] = ReportTemplate(
             type=ReportType.DOCUMENT,
             language="zh",
-            system_prompt="""你是一位资深的招采合规分析师，擅长识别投标文件雷同、串标和模板化风险。你的任务是基于提供的数据，输出面向招采场景的专业分析报告。
+            system_prompt="""你是招采合规分析师，专注于识别投标文件雷同和串标风险。
 
-报告要求：
-1. 用语沉稳、专业，贴合招标采购行业语境
-2. 结论紧扣数据，重点关注雷同、串标、模板复用等风险要点
-3. 提供可落地的整改、佐证或澄清建议
-4. 使用招采/工程管理常用术语，避免学术论文话术
-5. 结构清晰，便于评标委员会或监管人员快速理解""",
-            user_prompt_template="""请基于以下数据生成投标文件雷同性分析报告：
+核心任务：基于数据生成简洁、精准的风险分析报告。
 
-## 投标文件信息
+输出要求：
+1. **简洁为先**：总字数控制在 800-1200 字以内
+2. **数据驱动**：直接引用数据支撑结论，避免空泛描述
+3. **聚焦关键**：只分析高风险点和核心发现，不重复罗列已有数据
+4. **结论明确**：风险等级、主要问题、建议行动要清晰可执行
+5. **招采话术**：使用"投标人"、"评标"、"串标迹象"等行业术语""",
+            user_prompt_template="""## 任务：生成投标文件雷同性分析报告
+
+### 文档基础信息
 - 文件名称：{document_title}
 - 综合相似度：{total_similarity_score:.1%}
-- 合规风险等级：{risk_level}
+- 风险等级：{risk_level}
 - 对比来源数量：{sources_count}
 
-## 相似度来源分析
+### 相似度来源数据
 {sources_analysis}
 
-## 重点雷同片段
+### 重点雷同片段
 {match_details}
 
-## 统计数据
+### 统计数据
 {statistics}
 
-请生成包含以下章节的完整报告：
-1. 管理层摘要
-2. 合规风险评估
-3. 主要对比来源分析
-4. 重点雷同片段解读
-5. 整改建议与后续行动
+---
 
-报告应突出招采领域的雷同风险洞察，并给出务实的处理建议。""",
+### 报告结构（总字数 ≤ 1200 字）
+
+**1. 风险概述**（200字以内）
+- 一句话总结风险水平和核心问题
+- 关键数据点：相似度、主要来源、高风险片段数量
+
+**2. 关键发现**（400字以内）
+- 列举 TOP 3 高相似度来源，说明风险含义
+- 分析重点雷同片段的特征（技术方案/报价/资质等）
+- 标注最具风险的内容类型
+
+**3. 合规建议**（300字以内）
+- 针对高风险点的具体处理建议（要求澄清、现场核查、专家评审等）
+- 标注需要重点关注的对比文件
+
+---
+
+**输出规范**：
+- 直接陈述结论，不要重复原始数据
+- 每个发现必须引用具体数据支撑
+- 建议要具体可执行，避免空话""",
             sections=["executive_summary", "risk_assessment", "source_analysis", "key_matches", "recommendations"],
             chart_configs={
                 "similarity_pie": {"type": "pie", "title": "相似度来源分布"},
@@ -64,39 +81,56 @@ class ReportTemplateService(BaseService):
         self.templates["document_en"] = ReportTemplate(
             type=ReportType.DOCUMENT,
             language="en",
-            system_prompt="""You are a senior procurement compliance strategist who specialises in detecting tender document collusion, templated reuse, and suspicious similarity. Your task is to deliver a board-ready analysis grounded in the supplied data.
+            system_prompt="""You are a procurement compliance analyst specializing in tender collusion and bid-rigging detection.
 
-Report requirements:
-1. Use measured, executive-ready language aligned with public procurement discourse
-2. Anchor conclusions in data, highlighting collusion risk, templated content, or coordinated bidding signals
-3. Recommend practical remediation, clarification, or escalation actions
-4. Employ procurement and construction terminology rather than academic phrasing
-5. Keep the structure crisp for quick decision-making""",
-            user_prompt_template="""Please draft a tender similarity intelligence report based on the following data:
+Core Task: Generate concise, data-driven risk analysis reports.
 
-## Tender Document Profile
+Output Requirements:
+1. **Brevity First**: Total word count 800-1200 words
+2. **Data-Driven**: Support conclusions with specific data, avoid generic statements
+3. **Focus on Key Issues**: Analyze only high-risk findings, don't repeat raw data
+4. **Clear Conclusions**: Risk level, main issues, and actionable recommendations
+5. **Industry Language**: Use "bidder", "evaluation", "collusion indicators" terminology""",
+            user_prompt_template="""## Task: Generate Tender Similarity Analysis Report
+
+### Document Information
 - Document Title: {document_title}
 - Overall Similarity: {total_similarity_score:.1%}
-- Compliance Risk Level: {risk_level}
-- Number of Comparison Sources: {sources_count}
+- Risk Level: {risk_level}
+- Comparison Sources: {sources_count}
 
-## Source Comparison Analysis
+### Similarity Source Data
 {sources_analysis}
 
-## Critical Similar Segments
+### Critical Similar Segments
 {match_details}
 
-## Statistical Overview
+### Statistical Data
 {statistics}
 
-Please include the following sections:
-1. Executive Insight
-2. Compliance Risk Assessment
-3. Source Correlation Analysis
-4. Critical Overlap Commentary
-5. Remediation & Follow-up Actions
+---
 
-The tone should emphasise tender integrity risk and provide concrete guidance for procurement stakeholders.""",
+### Report Structure (Total ≤ 1200 words)
+
+**1. Risk Overview** (≤200 words)
+- One-sentence summary of risk level and core issues
+- Key data points: similarity score, main sources, high-risk segment count
+
+**2. Key Findings** (≤400 words)
+- List TOP 3 high-similarity sources with risk implications
+- Analyze characteristics of critical segments (technical/pricing/qualification)
+- Identify most risky content types
+
+**3. Compliance Recommendations** (≤300 words)
+- Specific actions for high-risk items (clarification, site verification, expert review)
+- Flag comparison documents requiring special attention
+
+---
+
+**Output Standards**:
+- State conclusions directly, don't repeat raw data
+- Every finding must cite specific supporting data
+- Recommendations must be specific and actionable""",
             sections=["executive_summary", "risk_assessment", "source_analysis", "key_matches", "recommendations"],
             chart_configs={
                 "similarity_pie": {"type": "pie", "title": "Similarity Source Distribution"},
@@ -108,42 +142,58 @@ The tone should emphasise tender integrity risk and provide concrete guidance fo
         self.templates["comparison_zh"] = ReportTemplate(
             type=ReportType.COMPARISON,
             language="zh",
-            system_prompt="""你是一位专注于招采领域的对比分析专家，擅长识别不同投标文件之间的雷同度、协同编制迹象以及潜在的串标风险。你的结论需要服务于评标与合规审查。
+            system_prompt="""你是招采对比分析专家，专注识别投标文件间的串标迹象和协同编制风险。
 
-报告要求：
-1. 语言克制且专业，贴合招标采购审查语境
-2. 结合数据分析雷同模式、共同来源与结构同步情况
-3. 提供可行的合规处理或进一步核查建议
-4. 使用招采与工程管理常用术语
-5. 保持结构清晰、逻辑严密""",
-            user_prompt_template="""请基于以下数据生成投标文件对比分析报告：
+核心任务：基于双向相似度数据，快速判断两份标书的关联关系。
 
-## 投标文件信息
-- 投标文件A：{document_a_title}
-- 投标文件B：{document_b_title}
+输出要求：
+1. **精准简洁**：总字数控制在 600-1000 字以内
+2. **结论优先**：开篇直接给出串标风险判断
+3. **数据说话**：用双向相似度、独有内容占比等数据支撑结论
+4. **聚焦异常**：重点分析不对称相似度和高度雷同片段
+5. **可执行建议**：明确告知是否需要进一步调查或处理""",
+            user_prompt_template="""## 任务：生成双标对比分析报告
 
-## 相似度分析
-- A→B雷同度：{similarity_a_to_b:.1%}
-- B→A雷同度：{similarity_b_to_a:.1%}
-- 共同内容比例：{common_similarity:.1%}
-- A独有内容占比：{unique_a_ratio:.1%}
-- B独有内容占比：{unique_b_ratio:.1%}
+### 对比文档
+- 文档 A：{document_a_title}
+- 文档 B：{document_b_title}
 
-## 重点雷同片段概览
+### 相似度指标
+- A→B 雷同度：{similarity_a_to_b:.1%}
+- B→A 雷同度：{similarity_b_to_a:.1%}
+- 共同内容占比：{common_similarity:.1%}
+- A 独有内容：{unique_a_ratio:.1%}
+- B 独有内容：{unique_b_ratio:.1%}
+
+### 重点雷同片段
 {match_details}
 
-## 并排对照数据
+### 并排对照数据
 {side_by_side_analysis}
 
-请生成包含以下章节的详细报告：
-1. 对比摘要
-2. 雷同度矩阵解读
-3. 内容分布与差异衡量
-4. 重点雷同片段说明
-5. 协同编制模式研判
-6. 结论与合规建议
+---
 
-请着重分析两份投标文件的关联关系及可能涉及的串标或模板化风险。""",
+### 报告结构（总字数 ≤ 1000 字）
+
+**1. 关联关系判断**（150字以内）
+- 一句话结论：是否存在串标或协同编制迹象
+- 关键依据：相似度数据异常情况
+
+**2. 核心发现**（400字以内）
+- 分析双向相似度差异（如 A→B 高但 B→A 低，说明可能存在抄袭方向）
+- 标注高度雷同片段的位置和内容类型
+- 评估独有内容占比的合理性
+
+**3. 风险评估与建议**（200字以内）
+- 明确风险等级（低/中/高/严重）
+- 给出具体处理建议（约谈澄清、要求说明、废标等）
+
+---
+
+**输出规范**：
+- 避免重复罗列原始数据
+- 重点解释数据背后的风险含义
+- 建议要有可操作性""",
             sections=["comparison_summary", "similarity_matrix", "content_distribution", "key_matches", "pattern_analysis", "conclusions"],
             chart_configs={
                 "similarity_matrix": {"type": "heatmap", "title": "相似度矩阵"},
@@ -155,48 +205,69 @@ The tone should emphasise tender integrity risk and provide concrete guidance fo
         self.templates["project_zh"] = ReportTemplate(
             type=ReportType.PROJECT,
             language="zh",
-            system_prompt="""你是一位资深的招采合规顾问，负责从项目维度审视整批投标文件的雷同风险与协同行为。你需要汇总整体态势，为监管或项目业主提供决策参考。
+            system_prompt="""你是招采合规顾问，负责项目级雷同风险全局分析。
 
-报告要求：
-1. 概览项目整体雷同度与串标风险态势
-2. 辨识系统性问题、群体协同或模板化行为
-3. 分析各标段/单位之间的相似网络关系
-4. 给出管理层面和合规层面的针对性建议
-5. 预测风险趋势并标注重点监控对象""",
-            user_prompt_template="""请基于以下数据生成项目级投标雷同风险报告：
+核心任务：从项目整体视角，快速识别系统性风险和重点监控对象。
 
-## 项目概况
+输出要求：
+1. **宏观聚焦**：总字数控制在 1000-1500 字以内
+2. **关键优先**：突出高风险文件和异常模式，忽略正常范围内的数据
+3. **数据洞察**：从统计分布中提炼规律，不要简单复述数字
+4. **风险分层**：明确哪些是重点风险、哪些是一般关注
+5. **决策导向**：告知项目业主或监管方应采取什么行动""",
+            user_prompt_template="""## 任务：生成项目级雷同风险报告
+
+### 项目概况
 - 项目名称：{project_name}
 - 投标文件总数：{total_documents}
-- 比对次数：{total_comparisons}
+- 比对总数：{total_comparisons}
 - 平均雷同度：{average_similarity:.1%}
-- 高风险文件数量：{high_risk_count}
+- 高风险文件数：{high_risk_count}
 
-## 统计分析
+### 统计分析
 {statistics_analysis}
 
-## 雷同度分布
+### 雷同度分布
 {similarity_distribution}
 
-## 高风险投标文件
+### 高风险文件
 {high_risk_documents}
 
-## 异常检测结果
+### 异常检测
 {anomalies}
 
-## 相似网络分析
+### 相似网络
 {network_analysis}
 
-请生成包含以下章节的综合项目报告：
-1. 管理层摘要
-2. 项目整体风险评估
-3. 统计走势与分布洞察
-4. 重点高风险投标文件解读
-5. 协同/模板化行为模式分析
-6. 异常预警与证据链
-7. 合规建议与后续行动
+---
 
-请紧扣招采合规视角，帮助读者快速掌握项目层面的雷同风险。""",
+### 报告结构（总字数 ≤ 1500 字）
+
+**1. 项目风险总览**（250字以内）
+- 一句话总结项目整体风险水平
+- 关键指标：高风险文件占比、平均雷同度、异常数量
+
+**2. 重点风险标的**（500字以内）
+- 列举 TOP 5 高风险文件，说明具体风险点
+- 标注是否存在集中雷同或关联串标迹象
+- 引用具体相似度数据和异常特征
+
+**3. 模式与趋势**（350字以内）
+- 分析雷同度分布特征（是否存在集中高峰、异常离群值）
+- 识别可能的协同编制或模板复用模式
+- 评估相似网络中的核心节点
+
+**4. 处理建议**（250字以内）
+- 明确哪些文件需要立即审查或废标
+- 哪些需要进一步调查或约谈
+- 项目层面的改进措施（加强资格预审、引入第三方核查等）
+
+---
+
+**输出规范**：
+- 避免逐条罗列统计数据，提炼关键洞察
+- 重点文件要有明确名称和风险评级
+- 建议要分轻重缓急""",
             sections=["project_summary", "overall_assessment", "statistical_analysis", "high_risk_cases", "behavior_patterns", "anomaly_detection", "recommendations"],
             chart_configs={
                 "similarity_distribution": {"type": "histogram", "title": "相似度分布"},

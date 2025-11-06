@@ -1,20 +1,19 @@
 """
 报告数据处理服务 - 处理和聚合抄袭检测数据为报告生成做准备
 """
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from collections import defaultdict
-from datetime import datetime
 import statistics
 
 from backend.models.report_models import (
-    ReportType, DocumentReportData, ComparisonReportData, ProjectReportData,
+    DocumentReportData, ComparisonReportData, ProjectReportData,
     SimilaritySource, MatchDetail, ProjectStatistics, RiskLevel
 )
 from backend.api.v1.compare import PairReportResponse, MatchGroup, MatchDetailModel, PairResponse
 from backend.db.models import Document, Project, ComparePair, CompareJob, DocumentChunk
 from backend.services.base_service import BaseService, singleton
 from backend.db import get_session
-from sqlmodel import select
+from sqlmodel import select, col
 from sqlmodel.ext.asyncio.session import AsyncSession
 from backend.services.service_factory import ServiceFactory
 
@@ -42,7 +41,7 @@ class ReportDataProcessor(BaseService):
 
     async def process_document_report_data(
         self,
-        document_id: str,
+        document_id: str | int,
         max_matches: int = 20
     ) -> DocumentReportData:
         """处理单文档报告数据"""
@@ -70,7 +69,7 @@ class ReportDataProcessor(BaseService):
 
             return DocumentReportData(
                 document_id=str(document_id),
-                document_title=document.title,
+                document_title=document.title or f"Document {document_id}",
                 total_similarity_score=total_similarity,
                 risk_level=self.calculate_risk_level(total_similarity),
                 sources=sources,
@@ -93,33 +92,33 @@ class ReportDataProcessor(BaseService):
             if not doc_a or not doc_b:
                 raise ValueError("One or both documents not found")
 
-            # 获取双向比较结果
+            # 获取比较结果
             pair_report_ab = await self._get_pair_report(session, document_a_id, document_b_id)
-            pair_report_ba = await self._get_pair_report(session, document_b_id, document_a_id)
 
             if not pair_report_ab:
                 raise ValueError(f"Comparison not found between {document_a_id} and {document_b_id}")
 
             # 计算相似度指标
-            similarity_a_to_b = self._calculate_directional_similarity(pair_report_ab)
-            similarity_b_to_a = self._calculate_directional_similarity(pair_report_ba) if pair_report_ba else similarity_a_to_b
+            similarity = self._calculate_directional_similarity(pair_report_ab)
+            similarity_a_to_b = similarity
+            similarity_b_to_a = similarity
 
             # 计算内容分布
-            common_similarity, unique_a_ratio, unique_b_ratio = self._calculate_content_distribution(
-                pair_report_ab, doc_a, doc_b
-            )
+            common_similarity = similarity
+            unique_a_ratio = max(0.0, 1.0 - similarity)
+            unique_b_ratio = max(0.0, 1.0 - similarity)
 
             # 提取匹配详情
             match_details = [self._convert_detail_model(detail) for detail in pair_report_ab.details]
 
             # 生成并排对比数据
-            side_by_side_sections = self._generate_side_by_side_data(pair_report_ab, doc_a, doc_b)
+            side_by_side_sections = self._generate_side_by_side_data(pair_report_ab)
 
             return ComparisonReportData(
                 document_a_id=document_a_id,
                 document_b_id=document_b_id,
-                document_a_title=doc_a.title,
-                document_b_title=doc_b.title,
+                document_a_title=doc_a.title or f"Document {document_a_id}",
+                document_b_title=doc_b.title or f"Document {document_b_id}",
                 similarity_a_to_b=similarity_a_to_b,
                 similarity_b_to_a=similarity_b_to_a,
                 common_similarity=common_similarity,
@@ -153,21 +152,21 @@ class ReportDataProcessor(BaseService):
 
             # 识别高风险文档
             high_risk_documents = await self._identify_high_risk_documents(
-                documents, all_comparisons, session
+                documents, all_comparisons
             )
 
             # 生成相似度网络图数据
             similarity_network = self._generate_similarity_network(documents, all_comparisons) if include_network else {}
 
             # 异常检测
-            anomalies = self._detect_anomalies(all_comparisons, statistics)
+            anomalies = self._detect_anomalies(all_comparisons)
 
             # 生成建议
             recommendations = self._generate_project_recommendations(statistics, anomalies)
 
             return ProjectReportData(
                 project_id=project_id,
-                project_name=project.name,
+                project_name=project.name or f"Project {project_id}",
                 statistics=statistics,
                 high_risk_documents=high_risk_documents,
                 similarity_network=similarity_network,
@@ -178,15 +177,14 @@ class ReportDataProcessor(BaseService):
     def _aggregate_similarity_sources(
         self,
         pair_reports: List[PairReportResponse],
-        target_document_id: str
+        target_document_id: str | int
     ) -> List[SimilaritySource]:
         """聚合相似度来源"""
         target_id = self._parse_int_id(target_document_id, "document")
-        source_map = defaultdict(lambda: {
+        source_map: Dict[int, Dict[str, Any]] = defaultdict(lambda: {
             'similarity_scores': [],
             'match_count': 0,
-            'total_length': 0,
-            'title': ''
+            'total_length': 0
         })
 
         for report in pair_reports:
@@ -204,10 +202,9 @@ class ReportDataProcessor(BaseService):
             source_map[source_id]['similarity_scores'].append(similarity)
             source_map[source_id]['match_count'] += len(report.details)
 
-            detail_map = self._group_details_by_group(report)
-            for details in detail_map.values():
-                for detail in details:
-                    source_map[source_id]['total_length'] += self._estimate_span_coverage(detail)
+            # 计算覆盖长度
+            for detail in report.details:
+                source_map[source_id]['total_length'] += self._estimate_span_coverage(detail)
 
         # 转换为SimilaritySource对象
         sources = []
@@ -216,7 +213,7 @@ class ReportDataProcessor(BaseService):
                 avg_similarity = statistics.mean(data['similarity_scores'])
                 sources.append(SimilaritySource(
                     document_id=str(source_id),
-                    document_title=data['title'] or f"Document {source_id}",
+                    document_title=f"Document {source_id}",
                     similarity_score=avg_similarity,
                     match_count=data['match_count'],
                     total_text_length=data['total_length']
@@ -373,13 +370,13 @@ class ReportDataProcessor(BaseService):
         return result.first()
 
     async def _get_document_comparisons(self, session: AsyncSession, document_id: str | int) -> List[PairReportResponse]:
-        """获取文档的所有比较结果 - 这里需要根据实际的数据库结构实现"""
+        """获取文档的所有比较结果"""
         doc_id = self._parse_int_id(document_id, "document")
 
         stmt = (
             select(ComparePair)
-            .where((ComparePair.left_document_id == doc_id) | (ComparePair.right_document_id == doc_id))
-            .order_by(ComparePair.created_at.desc())
+            .where((col(ComparePair.left_document_id) == doc_id) | (col(ComparePair.right_document_id) == doc_id))
+            .order_by(col(ComparePair.created_at).desc())
         )
         result = await session.exec(stmt)
         pairs = result.all()
@@ -388,9 +385,10 @@ class ReportDataProcessor(BaseService):
         for pair in pairs:
             try:
                 report = await self._build_pair_report_response(session, pair)
-            except ValueError:
+                reports.append(report)
+            except ValueError as e:
+                self.logger.warning(f"Skipping invalid pair {pair.id}: {e}")
                 continue
-            reports.append(report)
 
         return reports
 
@@ -404,16 +402,21 @@ class ReportDataProcessor(BaseService):
             raise ValueError("Comparison report missing document references")
 
         # Fetch chunk texts for detailed excerpts
-        chunk_ids = {
-            detail.left_chunk_id for detail in report.details
+        chunk_ids: set[int] = {
+            detail.left_chunk_id for detail in report.details if detail.left_chunk_id is not None
         } | {
-            detail.right_chunk_id for detail in report.details
+            detail.right_chunk_id for detail in report.details if detail.right_chunk_id is not None
         }
 
         chunk_text_map: Dict[int, str] = {}
         if chunk_ids:
-            result = await session.exec(select(DocumentChunk).where(DocumentChunk.id.in_(chunk_ids)))
-            chunk_text_map = {chunk.id: chunk.text for chunk in result.all()}
+            result = await session.exec(select(DocumentChunk).where(col(DocumentChunk.id).in_(list(chunk_ids))))
+            chunk_text_map = {chunk.id: chunk.text for chunk in result.all() if chunk.id is not None}
+
+        if report.pair.id is None:
+            raise ValueError("Pair ID is required")
+        if report.pair.left_document_id is None or report.pair.right_document_id is None:
+            raise ValueError("Document IDs are required")
 
         pair_payload = PairResponse(
             id=report.pair.id,
@@ -426,7 +429,7 @@ class ReportDataProcessor(BaseService):
 
         groups = [
             MatchGroup(
-                id=group.id,
+                id=group.id or 0,
                 left_chunk_id=group.left_chunk_id,
                 right_chunk_id=group.right_chunk_id,
                 final_score=group.final_score,
@@ -435,8 +438,9 @@ class ReportDataProcessor(BaseService):
                 alignment_ratio=group.alignment_ratio,
                 span_count=group.span_count,
                 match_count=group.match_count,
-                paragraph_spans=group.paragraph_spans_json,
-                document_spans=group.document_spans_json,
+                # FIXME: Database model returns dict instead of list, wrap it temporarily
+                paragraph_spans=[group.paragraph_spans_json] if isinstance(group.paragraph_spans_json, dict) else group.paragraph_spans_json,
+                document_spans=[group.document_spans_json] if isinstance(group.document_spans_json, dict) else group.document_spans_json,
             )
             for group in report.groups
         ]
@@ -457,11 +461,15 @@ class ReportDataProcessor(BaseService):
                     final_score=detail.final_score,
                     semantic_score=detail.semantic_score,
                     cross_score=detail.cross_score,
-                    spans=detail.spans_json,
+                    # FIXME: Database model returns dict instead of list, wrap it temporarily
+                    spans=[detail.spans_json] if isinstance(detail.spans_json, dict) else detail.spans_json,
                     left_excerpt=build_excerpt(detail.left_chunk_id),
                     right_excerpt=build_excerpt(detail.right_chunk_id)
                 )
             )
+
+        if report.left_document.id is None or report.right_document.id is None:
+            raise ValueError("Document IDs are required")
 
         return PairReportResponse(
             pair=pair_payload,
@@ -483,9 +491,9 @@ class ReportDataProcessor(BaseService):
 
         stmt = (
             select(ComparePair)
-            .where(ComparePair.left_document_id == left_id)
-            .where(ComparePair.right_document_id == right_id)
-            .order_by(ComparePair.created_at.desc())
+            .where(col(ComparePair.left_document_id) == left_id)
+            .where(col(ComparePair.right_document_id) == right_id)
+            .order_by(col(ComparePair.created_at).desc())
         )
         result = await session.exec(stmt)
         pair = result.first()
@@ -507,7 +515,7 @@ class ReportDataProcessor(BaseService):
         """获取项目内所有文档"""
         proj_id = self._parse_int_id(project_id, "project")
         result = await session.exec(select(Document).where(Document.project_id == proj_id))
-        return result.all()
+        return list(result.all())
 
     async def _get_project_comparisons(self, session: AsyncSession, project_id: str | int) -> List[PairReportResponse]:
         """获取项目内所有比较结果"""
@@ -515,9 +523,9 @@ class ReportDataProcessor(BaseService):
 
         stmt = (
             select(ComparePair)
-            .join(CompareJob, ComparePair.job_id == CompareJob.id)
-            .where(CompareJob.project_id == proj_id)
-            .order_by(ComparePair.created_at.desc())
+            .join(CompareJob, col(ComparePair.job_id) == col(CompareJob.id))
+            .where(col(CompareJob.project_id) == proj_id)
+            .order_by(col(ComparePair.created_at).desc())
         )
         result = await session.exec(stmt)
         pairs = result.all()
@@ -526,17 +534,19 @@ class ReportDataProcessor(BaseService):
         for pair in pairs:
             try:
                 report = await self._build_pair_report_response(session, pair)
-            except ValueError:
+                reports.append(report)
+            except ValueError as e:
+                self.logger.warning(f"Skipping invalid pair {pair.id}: {e}")
                 continue
-            reports.append(report)
 
         return reports
 
-    def _excerpt_text(self, text: Optional[str], max_length: int = 220) -> Optional[str]:
+    def _excerpt_text(self, text: Optional[str], max_length: Optional[int] = None) -> Optional[str]:
+        """提取文本摘录，默认不截断以显示完整段落"""
         if not text:
             return None
         clean = text.strip()
-        if len(clean) <= max_length:
+        if max_length is None or len(clean) <= max_length:
             return clean
         return clean[:max_length].rstrip() + "..."
 
@@ -596,29 +606,9 @@ class ReportDataProcessor(BaseService):
             match_type='semantic'
         )
 
-    def _calculate_content_distribution(
-        self,
-        pair_report: PairReportResponse,
-        doc_a: Document,
-        doc_b: Document
-    ) -> Tuple[float, float, float]:
-        """计算内容分布 (共同相似度, A独有比例, B独有比例)"""
-        total_matches = len(pair_report.details)
-        if total_matches == 0:
-            return 0.0, 1.0, 1.0
-
-        similarity = self._calculate_directional_similarity(pair_report)
-        common_similarity = similarity
-        unique_a_ratio = max(0.0, 1.0 - similarity)
-        unique_b_ratio = max(0.0, 1.0 - similarity)
-
-        return common_similarity, unique_a_ratio, unique_b_ratio
-
     def _generate_side_by_side_data(
         self,
-        pair_report: PairReportResponse,
-        doc_a: Document,
-        doc_b: Document
+        pair_report: PairReportResponse
     ) -> List[Dict[str, Any]]:
         """生成并排对比数据"""
         sections = []
@@ -652,14 +642,16 @@ class ReportDataProcessor(BaseService):
     async def _identify_high_risk_documents(
         self,
         documents: List[Document],
-        comparisons: List[PairReportResponse],
-        session: AsyncSession
+        comparisons: List[PairReportResponse]
     ) -> List[DocumentReportData]:
         """识别高风险文档"""
         high_risk_docs = []
 
         # 计算每个文档的风险
         for doc in documents:
+            if doc.id is None:
+                continue
+
             doc_comparisons = [
                 comp for comp in comparisons
                 if comp.left_document_id == doc.id or comp.right_document_id == doc.id
@@ -707,22 +699,18 @@ class ReportDataProcessor(BaseService):
 
     def _detect_anomalies(
         self,
-        comparisons: List[PairReportResponse],
-        statistics: ProjectStatistics
+        comparisons: List[PairReportResponse]
     ) -> List[Dict[str, Any]]:
-        """检测异常"""
+        """检测异常高相似度"""
         anomalies = []
 
         if not comparisons:
             return anomalies
 
-        similarities = [self._calculate_directional_similarity(comp) for comp in comparisons]
-
-        # 检测异常高的相似度
-        threshold = statistics.average_similarity + 2 * statistics.average_similarity  # 简化的异常检测
+        # 检测高相似度（>0.8）
         for comp in comparisons:
             similarity = self._calculate_directional_similarity(comp)
-            if similarity > threshold and similarity > 0.8:
+            if similarity > 0.8:
                 anomalies.append({
                     'type': 'high_similarity',
                     'severity': 'critical' if similarity > 0.9 else 'high',

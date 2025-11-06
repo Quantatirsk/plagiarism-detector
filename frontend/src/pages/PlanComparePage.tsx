@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState, memo } from 'react';
+import { useCallback, useEffect, useMemo, useState, memo } from 'react';
 import type {
   DocumentDetail,
   DocumentSummary,
@@ -10,7 +10,7 @@ import type {
 import { Button } from '@/components/ui/button';
 import { PageShell, PageHeader } from '@/components/layout/Page';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MatchInfoTooltip } from '@/components/ui/match-info-popover';
+import { MatchInfoTooltip, type MatchData } from '@/components/ui/match-info-popover';
 import { cn } from '@/lib/utils';
 import { buildSegmentsWithOverlap, type HighlightInterval as ImportedHighlightInterval } from '@/utils/highlightUtilsSimple';
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
@@ -224,17 +224,22 @@ export function PlanComparePage({
             <Button
               variant="default"
               size="sm"
-              className="text-xs"
+              className="text-xs h-7"
               onClick={onBack}
             >
               ← 返回任务
             </Button>
             <div className="border-l border-border pl-3">
-              <div className="text-sm font-medium">
+              <div className="text-sm font-semibold">
                 {formatDocumentLabel(report.pair.left_document_id, documentLookup, leftDocument)} ↔{' '}
                 {formatDocumentLabel(report.pair.right_document_id, documentLookup, rightDocument)}
               </div>
-              <div className="text-xs text-muted-foreground">匹配数量：{matches.length}</div>
+              <div className="text-[11px] text-muted-foreground flex items-center gap-2">
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                  匹配数量：{matches.length}
+                </span>
+              </div>
             </div>
           </>
         }
@@ -243,11 +248,11 @@ export function PlanComparePage({
             <Button
               variant="outline"
               size="sm"
-              className="text-xs"
+              className="text-xs h-7"
               onClick={handleDownloadComparison}
               disabled={!report}
             >
-              <Download className="mr-2 h-4 w-4" /> 下载对比结果
+              <Download className="mr-1.5 h-3.5 w-3.5" /> 下载对比结果
             </Button>
             <PairSwitcher
               pairs={pairOptions}
@@ -270,8 +275,8 @@ export function PlanComparePage({
           </div>
         )}
         <main className="flex-1 min-h-0 overflow-hidden">
-          <div className="relative flex h-full min-h-0 flex-col gap-5 p-6">
-            <div className="grid flex-1 min-h-0 grid-cols-1 gap-5 xl:grid-cols-2">
+          <div className="relative flex h-full min-h-0 flex-col gap-3 p-4">
+            <div className="grid flex-1 min-h-0 grid-cols-1 gap-3 xl:grid-cols-2">
               <DocumentPane
                 title="左侧文档"
                 segments={leftSegments}
@@ -294,7 +299,7 @@ export function PlanComparePage({
         </main>
         <aside className={cn(
           "relative flex flex-col border-l border-border bg-card shadow-sm transition-all duration-300",
-          sidebarCollapsed ? "w-0 max-w-0" : "w-72 min-w-[18rem]"
+          sidebarCollapsed ? "w-0 max-w-0" : "w-64 min-w-[16rem]"
         )}>
           <button
             type="button"
@@ -309,36 +314,49 @@ export function PlanComparePage({
           </button>
           {!sidebarCollapsed && (
             <>
-              <div className="flex items-center justify-between border-b border-border px-4 py-3 flex-shrink-0">
-                <h2 className="text-sm font-medium text-muted-foreground">匹配列表</h2>
-                <span className="text-xs text-muted-foreground">{matches.length}</span>
+              <div className="flex items-center justify-between border-b border-border px-3 py-2 flex-shrink-0 bg-muted/30">
+                <h2 className="text-xs font-semibold text-foreground uppercase tracking-wide">匹配列表</h2>
+                <span className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{matches.length}</span>
               </div>
               <div className="flex-1 min-h-0 overflow-auto">
                 {matches.length === 0 ? (
-                  <p className="px-4 py-4 text-sm text-muted-foreground">未发现匹配结果。</p>
+                  <p className="px-3 py-3 text-xs text-muted-foreground">未发现匹配结果。</p>
                 ) : (
-                  <ul className="divide-y divide-border/60">
+                  <ul className="divide-y divide-border/40">
                     {matches.map((match, index) => {
                       const { group } = match;
                       const isActive = match.key === activeKey;
+                      const finalScore = group.final_score || 0;
                       return (
                         <li key={match.key}>
                           <button
                             onClick={() => handleSelectMatch(match.key, 'left')}
                             className={cn(
-                              'flex w-full flex-col gap-1 px-4 py-3 text-left text-sm transition',
-                              isActive ? 'font-medium ring-1 ring-primary/30 bg-accent' : 'hover:bg-accent/50',
-                              'hover:bg-accent'
+                              'flex w-full flex-col gap-1.5 px-3 py-2 text-left text-sm transition-colors relative',
+                              isActive ? 'bg-primary/10 border-l-2 border-primary' : 'hover:bg-accent/60 border-l-2 border-transparent'
                             )}
                             data-match-key={match.key}
                           >
                             <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium text-muted-foreground">#{index + 1}</span>
-                              <span className={cn('text-xs font-mono', getScoreColorClasses(group.final_score))}>{formatScore(group.final_score)}</span>
+                              <span className="text-[10px] font-medium text-muted-foreground">#{index + 1}</span>
+                              <span className={cn('text-xs font-mono font-semibold', getScoreColorClasses(group.final_score))}>{formatScore(group.final_score)}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                              <span>语义 {formatScore(group.semantic_score)}</span>
-                              <span>交叉编码 {formatScore(group.cross_score)}</span>
+                            {/* 迷你进度条 */}
+                            <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className={cn('h-full transition-all', getScoreColorClasses(finalScore, true))}
+                                style={{ width: `${finalScore * 100}%` }}
+                              />
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                              <span className="flex items-center gap-0.5">
+                                <span className="w-1 h-1 rounded-full bg-blue-500"></span>
+                                {formatScore(group.semantic_score)}
+                              </span>
+                              <span className="flex items-center gap-0.5">
+                                <span className="w-1 h-1 rounded-full bg-purple-500"></span>
+                                {formatScore(group.cross_score)}
+                              </span>
                             </div>
                           </button>
                         </li>
@@ -367,11 +385,11 @@ interface DocumentPaneProps {
 function DocumentPane({ title, segments, activeKey, side, matches, onSelectMatch }: DocumentPaneProps) {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2 text-sm font-medium text-muted-foreground">
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5 text-xs font-semibold text-foreground bg-muted/30 uppercase tracking-wide">
         <span>{title}</span>
       </div>
       <div className="relative flex-1 min-h-0 min-w-0 overflow-auto bg-background">
-        <article className="min-w-0 whitespace-pre-wrap break-words px-6 py-4 text-sm leading-relaxed text-justify">
+        <article className="min-w-0 whitespace-pre-wrap break-words px-4 py-3 text-[13px] leading-relaxed text-justify">
           <RenderSegments segments={segments} activeKey={activeKey} side={side} matches={matches} onSelectMatch={onSelectMatch} />
         </article>
       </div>
@@ -381,7 +399,7 @@ function DocumentPane({ title, segments, activeKey, side, matches, onSelectMatch
 
 interface PairSwitcherProps {
   pairs: ComparePairSummary[];
-  currentPair: ComparePairSummary;
+  currentPair: ComparePairSummary | undefined;
   loading: boolean;
   error: string | null;
   documentLookup: DocumentLookup;
@@ -400,28 +418,30 @@ function PairSwitcher({
   currentRightDocument,
   onSwitchPair,
 }: PairSwitcherProps) {
-  const [leftSelection, setLeftSelection] = useState<number>(currentPair.left_document_id);
-  const [rightSelection, setRightSelection] = useState<number>(currentPair.id);
+  const [leftSelection, setLeftSelection] = useState<number>(currentPair?.left_document_id ?? 0);
+  const [rightSelection, setRightSelection] = useState<number>(currentPair?.id ?? 0);
 
   const uniqueLefts = useMemo(() => Array.from(new Set(pairs.map((pair) => pair.left_document_id))), [pairs]);
 
   useEffect(() => {
-    setLeftSelection(currentPair.left_document_id);
-    setRightSelection(currentPair.id);
-  }, [currentPair.id, currentPair.left_document_id]);
+    if (currentPair) {
+      setLeftSelection(currentPair.left_document_id);
+      setRightSelection(currentPair.id);
+    }
+  }, [currentPair]);
 
   useEffect(() => {
-    if (uniqueLefts.length === 0) {
+    if (uniqueLefts.length === 0 || !currentPair) {
       return;
     }
     if (!uniqueLefts.includes(leftSelection)) {
       setLeftSelection(currentPair.left_document_id);
     }
-  }, [leftSelection, uniqueLefts, currentPair.left_document_id]);
+  }, [leftSelection, uniqueLefts, currentPair]);
 
   const pairsForLeft = useMemo(() => {
     const subset = pairs.filter((pair) => pair.left_document_id === leftSelection);
-    const base = subset.length ? subset : [currentPair];
+    const base = subset.length ? subset : (currentPair ? [currentPair] : []);
     return base
       .slice()
       .sort((a, b) =>
@@ -429,7 +449,7 @@ function PairSwitcher({
       );
   }, [pairs, leftSelection, currentPair]);
 
-  const currentIndex = pairsForLeft.findIndex((pair) => pair.id === currentPair.id);
+  const currentIndex = pairsForLeft.findIndex((pair) => pair.id === currentPair?.id);
   const canPrev = currentIndex > 0;
   const canNext = currentIndex >= 0 && currentIndex < pairsForLeft.length - 1;
   const disableLeftSelect = uniqueLefts.length <= 1;
@@ -437,7 +457,7 @@ function PairSwitcher({
 
   const handleLeftChange = (value: string) => {
     const nextLeft = Number(value);
-    if (Number.isNaN(nextLeft)) {
+    if (Number.isNaN(nextLeft) || !currentPair) {
       return;
     }
     setLeftSelection(nextLeft);
@@ -458,7 +478,7 @@ function PairSwitcher({
 
   const handleRightChange = (value: string) => {
     const nextId = Number(value);
-    if (!Number.isNaN(nextId)) {
+    if (!Number.isNaN(nextId) && currentPair) {
       setRightSelection(nextId);
       if (nextId !== currentPair.id) {
         onSwitchPair(nextId);
@@ -470,14 +490,20 @@ function PairSwitcher({
     if (!canPrev) {
       return;
     }
-    onSwitchPair(pairsForLeft[currentIndex - 1].id);
+    const prevPair = pairsForLeft[currentIndex - 1];
+    if (prevPair) {
+      onSwitchPair(prevPair.id);
+    }
   };
 
   const handleNext = () => {
     if (!canNext) {
       return;
     }
-    onSwitchPair(pairsForLeft[currentIndex + 1].id);
+    const nextPair = pairsForLeft[currentIndex + 1];
+    if (nextPair) {
+      onSwitchPair(nextPair.id);
+    }
   };
 
   return (
@@ -503,7 +529,7 @@ function PairSwitcher({
                     {formatDocumentLabel(
                       left,
                       documentLookup,
-                      left === currentPair.left_document_id ? currentLeftDocument : null,
+                      left === currentPair?.left_document_id ? currentLeftDocument : null,
                     )}
                   </span>
                 </SelectItem>
@@ -528,7 +554,7 @@ function PairSwitcher({
                     {formatDocumentLabel(
                       pair.right_document_id,
                       documentLookup,
-                      pair.id === currentPair.id ? currentRightDocument : null,
+                      pair.id === currentPair?.id ? currentRightDocument : null,
                     )}
                   </span>
                 </SelectItem>
@@ -590,9 +616,12 @@ const RenderSegments = memo(({ segments, activeKey, side, matches, onSelectMatch
 
     // Check if this segment has overlapping matches
     const hasOverlaps = segment.allMatches && segment.allMatches.length > 1;
-    const overlappingMatches = hasOverlaps
-      ? segment.allMatches!.map(am => matches.find(m => m.key === am.matchKey)).filter(Boolean)
-      : [match].filter(Boolean);
+    const overlappingMatches: MatchData[] = hasOverlaps
+      ? segment.allMatches!
+          .map(am => matches.find(m => m.key === am.matchKey))
+          .filter((m): m is NormalisedMatch => m !== undefined && m !== null)
+          .map(m => ({ group: m.group, details: m.details }))
+      : (match ? [{ group: match.group, details: match.details }] : []);
     const baseClasses =
       'rounded-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary/60 break-words match-highlight';
 
@@ -1031,15 +1060,15 @@ function formatScore(value: number | null | undefined) {
 function getScoreColorClasses(score: number | null | undefined, isBackground = false): string {
   const finalScore = score || 0;
   if (finalScore > 0.9) {
-    return isBackground ? 'bg-red-400/50 hover:bg-red-400/65' : 'text-red-600';
+    return isBackground ? 'bg-red-500/75 hover:bg-red-500/85' : 'text-red-700';
   } else if (finalScore >= 0.85) {
-    return isBackground ? 'bg-orange-300/50 hover:bg-orange-300/65' : 'text-orange-600';
+    return isBackground ? 'bg-orange-400/70 hover:bg-orange-400/80' : 'text-orange-700';
   } else if (finalScore >= 0.8) {
-    return isBackground ? 'bg-yellow-300/50 hover:bg-yellow-300/65' : 'text-yellow-600';
+    return isBackground ? 'bg-yellow-400/65 hover:bg-yellow-400/75' : 'text-yellow-700';
   } else if (finalScore >= 0.7) {
-    return isBackground ? 'bg-green-300/50 hover:bg-green-300/65' : 'text-green-600';
+    return isBackground ? 'bg-green-400/65 hover:bg-green-400/75' : 'text-green-700';
   } else {
-    return isBackground ? 'bg-gray-200/50 hover:bg-gray-200/65' : 'text-gray-500';
+    return isBackground ? 'bg-gray-300/60 hover:bg-gray-300/70' : 'text-gray-600';
   }
 }
 

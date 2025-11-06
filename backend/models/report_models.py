@@ -149,5 +149,5 @@ class ReportProgress(BaseModel):
     progress: float = Field(..., description="进度百分比 (0-1)")
     stage: str = Field(..., description="当前阶段")
     message: str = Field(..., description="进度信息")
-    estimated_remaining: Optional[int] = Field(None, description="预计剩余时间(秒)")
-    error: Optional[str] = Field(None, description="错误信息")
+    estimated_remaining: Optional[int] = Field(default=None, description="预计剩余时间(秒)")
+    error: Optional[str] = Field(default=None, description="错误信息")

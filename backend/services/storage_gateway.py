@@ -7,7 +7,7 @@ from typing import Iterable, List, Optional, Sequence
 
 from sqlalchemy import delete, or_
 from sqlalchemy.exc import NoResultFound
-from sqlmodel import select
+from sqlmodel import select, col
 
 from backend.db import get_session
 from backend.db.models import (
@@ -134,9 +134,9 @@ class StorageGateway(BaseService):
 
     async def list_projects(self) -> List[Project]:
         async with get_session() as session:
-            stmt = select(Project).order_by(Project.created_at.desc())
+            stmt = select(Project).order_by(col(Project.created_at).desc())
             result = await session.exec(stmt)
-            return result.all()
+            return list(result.all())
 
     async def fetch_project(self, project_id: int) -> Optional[Project]:
         async with get_session() as session:
@@ -363,6 +363,8 @@ class StorageGateway(BaseService):
             return
         async with get_session() as session:
             for entry in details:
+                if entry.group_id is None:
+                    raise ValueError(f"MatchDetail requires group_id, got None for chunks {entry.left_chunk_id}/{entry.right_chunk_id}")
                 record = MatchDetail(
                     group_id=entry.group_id,
                     left_chunk_id=entry.left_chunk_id,
@@ -385,15 +387,15 @@ class StorageGateway(BaseService):
             stmt = select(DocumentChunk).where(DocumentChunk.document_id == document_id)
             if chunk_type is not None:
                 stmt = stmt.where(DocumentChunk.chunk_type == chunk_type)
-            stmt = stmt.order_by(DocumentChunk.chunk_index.asc())
+            stmt = stmt.order_by(col(DocumentChunk.chunk_index).asc())
             result = await session.exec(stmt)
-            return result.all()
+            return list(result.all())
 
     async def fetch_pairs_for_job(self, job_id: int) -> List[ComparePair]:
         async with get_session() as session:
             stmt = select(ComparePair).where(ComparePair.job_id == job_id)
             result = await session.exec(stmt)
-            return result.all()
+            return list(result.all())
 
     async def fetch_match_report(self, pair_id: int) -> dict:
         async with get_session() as session:
@@ -404,7 +406,7 @@ class StorageGateway(BaseService):
             document_ids = {pair.left_document_id, pair.right_document_id}
             documents = {
                 document.id: document
-                for document in (await session.exec(select(Document).where(Document.id.in_(document_ids)))).all()
+                for document in (await session.exec(select(Document).where(col(Document.id).in_(document_ids)))).all()
             }
 
             stmt = select(MatchGroup).where(MatchGroup.pair_id == pair_id)
@@ -413,8 +415,8 @@ class StorageGateway(BaseService):
             group_ids = [group.id for group in groups]
             details: List[MatchDetail] = []
             if group_ids:
-                detail_stmt = select(MatchDetail).where(MatchDetail.group_id.in_(group_ids))
-                details = (await session.exec(detail_stmt)).all()
+                detail_stmt = select(MatchDetail).where(col(MatchDetail.group_id).in_(group_ids))
+                details = list((await session.exec(detail_stmt)).all())
 
             detail_map = {}
             for detail in details:
@@ -440,35 +442,35 @@ class StorageGateway(BaseService):
 
         async with get_session() as session:
             chunk_result = await session.exec(
-                select(DocumentChunk.id).where(DocumentChunk.document_id.in_(doc_ids))
+                select(DocumentChunk.id).where(col(DocumentChunk.document_id).in_(doc_ids))
             )
-            chunk_ids = chunk_result.all()
+            chunk_ids = list(chunk_result.all())
 
             pair_result = await session.exec(
                 select(ComparePair.id).where(
                     or_(
-                        ComparePair.left_document_id.in_(doc_ids),
-                        ComparePair.right_document_id.in_(doc_ids),
+                        col(ComparePair.left_document_id).in_(doc_ids),
+                        col(ComparePair.right_document_id).in_(doc_ids),
                     )
                 )
             )
-            pair_ids = pair_result.all()
+            pair_ids = list(pair_result.all())
 
             if pair_ids:
                 group_result = await session.exec(
-                    select(MatchGroup.id).where(MatchGroup.pair_id.in_(pair_ids))
+                    select(MatchGroup.id).where(col(MatchGroup.pair_id).in_(pair_ids))
                 )
-                group_ids = group_result.all()
+                group_ids = list(group_result.all())
                 if group_ids:
-                    await session.exec(delete(MatchDetail).where(MatchDetail.group_id.in_(group_ids)))
-                    await session.exec(delete(MatchGroup).where(MatchGroup.id.in_(group_ids)))
-                await session.exec(delete(ComparePair).where(ComparePair.id.in_(pair_ids)))
+                    await session.execute(delete(MatchDetail).where(col(MatchDetail.group_id).in_(group_ids)))
+                    await session.execute(delete(MatchGroup).where(col(MatchGroup.id).in_(group_ids)))
+                await session.execute(delete(ComparePair).where(col(ComparePair.id).in_(pair_ids)))
 
             if chunk_ids:
-                await session.exec(delete(ChunkEmbedding).where(ChunkEmbedding.chunk_id.in_(chunk_ids)))
-                await session.exec(delete(DocumentChunk).where(DocumentChunk.id.in_(chunk_ids)))
+                await session.execute(delete(ChunkEmbedding).where(col(ChunkEmbedding.chunk_id).in_(chunk_ids)))
+                await session.execute(delete(DocumentChunk).where(col(DocumentChunk.id).in_(chunk_ids)))
 
-            await session.exec(delete(Document).where(Document.id.in_(doc_ids)))
+            await session.execute(delete(Document).where(col(Document.id).in_(doc_ids)))
             await session.commit()
 
     async def delete_pairs(self, pair_ids: Iterable[int]) -> None:
@@ -478,15 +480,15 @@ class StorageGateway(BaseService):
 
         async with get_session() as session:
             group_result = await session.exec(
-                select(MatchGroup.id).where(MatchGroup.pair_id.in_(ids))
+                select(MatchGroup.id).where(col(MatchGroup.pair_id).in_(ids))
             )
-            group_ids = group_result.all()
+            group_ids = list(group_result.all())
 
             if group_ids:
-                await session.exec(delete(MatchDetail).where(MatchDetail.group_id.in_(group_ids)))
-                await session.exec(delete(MatchGroup).where(MatchGroup.id.in_(group_ids)))
+                await session.execute(delete(MatchDetail).where(col(MatchDetail.group_id).in_(group_ids)))
+                await session.execute(delete(MatchGroup).where(col(MatchGroup.id).in_(group_ids)))
 
-            await session.exec(delete(ComparePair).where(ComparePair.id.in_(ids)))
+            await session.execute(delete(ComparePair).where(col(ComparePair.id).in_(ids)))
             await session.commit()
 
     async def delete_job(self, job_id: int) -> None:
@@ -494,13 +496,13 @@ class StorageGateway(BaseService):
             pair_result = await session.exec(
                 select(ComparePair.id).where(ComparePair.job_id == job_id)
             )
-            pair_ids = pair_result.all()
+            pair_ids = [pid for pid in pair_result.all() if pid is not None]
 
         if pair_ids:
             await self.delete_pairs(pair_ids)
 
         async with get_session() as session:
-            await session.exec(delete(CompareJob).where(CompareJob.id == job_id))
+            await session.execute(delete(CompareJob).where(col(CompareJob.id) == job_id))
             await session.commit()
 
     async def fetch_compare_job(self, job_id: int) -> Optional[CompareJob]:

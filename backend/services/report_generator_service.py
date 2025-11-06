@@ -1,7 +1,6 @@
 """
 报告生成服务 - 整合LLM、模板和数据处理，生成完整的抄袭检测报告
 """
-import asyncio
 import json
 import uuid
 import html
@@ -18,8 +17,6 @@ from backend.services.llm_service import LLMService
 from backend.services.report_template_service import ReportTemplateService
 from backend.services.report_data_processor import ReportDataProcessor
 from backend.services.service_factory import ServiceFactory
-from backend.core.errors import LLMError
-import structlog
 
 
 @singleton
@@ -106,11 +103,19 @@ class ReportGeneratorService(BaseService):
                 {"role": "user", "content": user_prompt}
             ]
 
+            # 根据报告类型调整 token 限制以控制输出长度
+            max_tokens_map = {
+                "document": 2000,    # 800-1200 字
+                "comparison": 1500,  # 600-1000 字
+                "project": 2500      # 1000-1500 字
+            }
+            max_tokens = max_tokens_map.get(request.type.value, 2000)
+
             llm_response = await self.llm_service.chat_completion(
                 messages=messages,
                 model=request.llm_model,
-                temperature=0.7,
-                max_tokens=4096
+                temperature=0.3,  # 降低温度以获得更精准、简洁的输出
+                max_tokens=max_tokens
             )
 
             # 阶段4: 处理和结构化报告内容
@@ -161,12 +166,20 @@ class ReportGeneratorService(BaseService):
                 {"role": "user", "content": user_prompt}
             ]
 
+            # 根据报告类型调整 token 限制以控制输出长度
+            max_tokens_map = {
+                "document": 2000,    # 800-1200 字
+                "comparison": 1500,  # 600-1000 字
+                "project": 2500      # 1000-1500 字
+            }
+            max_tokens = max_tokens_map.get(request.type.value, 2000)
+
             content_buffer = ""
             async for chunk in self.llm_service.stream_chat_completion(
                 messages=messages,
                 model=request.llm_model,
-                temperature=0.7,
-                max_tokens=4096
+                temperature=0.3,  # 降低温度以获得更精准、简洁的输出
+                max_tokens=max_tokens
             ):
                 content_buffer += chunk
                 yield json.dumps({"type": "content", "chunk": chunk}) + "\n"

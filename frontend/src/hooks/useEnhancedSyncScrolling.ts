@@ -23,8 +23,8 @@ interface PositionMapping {
 }
 
 export interface EnhancedSyncScrollingHook {
-  leftPanelRef: React.RefObject<HTMLDivElement>;
-  rightPanelRef: React.RefObject<HTMLDivElement>;
+  leftPanelRef: React.RefObject<HTMLDivElement | null>;
+  rightPanelRef: React.RefObject<HTMLDivElement | null>;
   isScrollSyncing: boolean;
   scrollToMatch: (matchId: string) => void;
   scrollToPosition: (position: number, sourcePanel?: 'left' | 'right') => void;
@@ -43,7 +43,7 @@ export const useEnhancedSyncScrolling = (
     enabled = true,
     debounceMs = 100,
     smoothScroll = true,
-    syncThreshold = 10,
+    syncThreshold: _syncThreshold = 10,
   } = options;
 
   const leftPanelRef = useRef<HTMLDivElement>(null);
@@ -143,7 +143,7 @@ export const useEnhancedSyncScrolling = (
    * Handle scroll event with debouncing
    */
   const handleScroll = useCallback((
-    event: Event,
+    _event: Event,
     sourcePanel: 'left' | 'right'
   ) => {
     if (!syncEnabled || isInternalSync.current) return;

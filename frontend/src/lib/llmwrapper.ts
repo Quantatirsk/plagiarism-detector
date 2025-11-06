@@ -67,6 +67,16 @@ export interface ModelsResponse {
   data: ModelInfo[]
 }
 
+interface LLMRequestBody {
+  messages: ChatMessage[]
+  stream: boolean
+  max_tokens?: number
+  temperature?: number
+  model?: string
+  api_key?: string
+  base_url?: string
+}
+
 export class LLMWrapper {
   constructor() {
     // No need to store baseUrl, will use getApiUrl directly
@@ -321,23 +331,25 @@ export class LLMWrapper {
    */
   private async makeRequest(options: ChatCompletionOptions): Promise<Response> {
     // Build request body with required fields
-    const requestBody: any = {
+    const requestBody: LLMRequestBody = {
       messages: options.messages,
       stream: options.stream || false,
-      max_tokens: options.maxTokens,
       temperature: options.temperature || 0.7
     }
-    
-    // Only include model if explicitly provided
-    // This allows backend to use its configured default model
-    if (options.model) {
-      requestBody.model = options.model;
+
+    // Only include optional fields if explicitly provided
+    if (options.maxTokens !== undefined) {
+      requestBody.max_tokens = options.maxTokens
     }
-    
+
+    if (options.model) {
+      requestBody.model = options.model
+    }
+
     if (options.apiKey) {
       requestBody.api_key = options.apiKey
     }
-    
+
     if (options.baseUrl) {
       requestBody.base_url = options.baseUrl
     }

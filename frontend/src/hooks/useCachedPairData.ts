@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { plagiarismApi, type PairReport, type DocumentDetail, type ComparePairSummary } from '@/api/plagiarismApi';
+import { plagiarismApi, type PairReport, type DocumentDetail } from '@/api/plagiarismApi';
 
 interface CachedPairData {
   report: PairReport | null;

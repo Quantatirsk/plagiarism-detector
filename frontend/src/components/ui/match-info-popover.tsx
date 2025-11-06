@@ -1,10 +1,16 @@
 import React from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
+import type { MatchGroupModel, MatchDetailModel } from '@/api/plagiarismApi';
+
+export interface MatchData {
+  group: MatchGroupModel;
+  details?: MatchDetailModel[];
+}
 
 interface MatchInfoProps {
   children: React.ReactNode;
-  match: any;
-  allMatches?: any[];
+  match: MatchData | null;
+  allMatches?: MatchData[];
 }
 
 export function MatchInfoTooltip({ children, match, allMatches }: MatchInfoProps) {
@@ -14,6 +20,7 @@ export function MatchInfoTooltip({ children, match, allMatches }: MatchInfoProps
 
   const hasMultipleMatches = allMatches && allMatches.length > 1;
   const hasDetails = match.details && match.details.length > 0;
+  const details = match.details || [];
 
   const formatScore = (value: number | null | undefined) => {
     if (value == null) return '—';
@@ -66,7 +73,7 @@ export function MatchInfoTooltip({ children, match, allMatches }: MatchInfoProps
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
-                  {match.details.slice(0, 10).map((detail: any, index: number) => (
+                  {details.slice(0, 10).map((detail, index: number) => (
                     <tr key={index} className="hover:bg-muted/30">
                       <td className="px-3 py-2 font-mono text-xs">
                         {(() => {
@@ -88,10 +95,10 @@ export function MatchInfoTooltip({ children, match, allMatches }: MatchInfoProps
                       <td className="px-3 py-2 text-right">{formatScore(detail.cross_score)}%</td>
                     </tr>
                   ))}
-                  {match.details.length > 10 && (
+                  {details.length > 10 && (
                     <tr>
                       <td colSpan={4} className="px-3 py-2 text-center text-muted-foreground">
-                        还有 {match.details.length - 10} 条...
+                        还有 {details.length - 10} 条...
                       </td>
                     </tr>
                   )}

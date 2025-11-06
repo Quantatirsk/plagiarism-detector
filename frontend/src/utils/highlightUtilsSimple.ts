@@ -56,7 +56,7 @@ export function buildSegmentsWithOverlap(text: string, intervals: HighlightInter
   const activeIntervals = new Set<HighlightInterval>();
   let cursor = 0;
 
-  events.forEach((event, i) => {
+  events.forEach((event, _i) => {
     const pos = Math.min(event.pos, text.length);
 
     // Add plain text before this position

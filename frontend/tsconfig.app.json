@@ -16,12 +16,22 @@
     "jsx": "react-jsx",
 
     /* Linting */
-    "strict": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "erasableSyntaxOnly": true,
+    /* Linting */
+    "strict": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": false,
+    "noUncheckedSideEffectImports": true,
+    "allowUnreachableCode": false,
+    "forceConsistentCasingInFileNames": true,
+    "erasableSyntaxOnly": true,
+    /* 可以放宽的规则 */
+    "noUncheckedIndexedAccess": false, // 🟢 强烈建议关闭
+    "exactOptionalPropertyTypes": false, // 🟢 强烈建议关闭
+    "noImplicitReturns": false, // 🟢 建议关闭
+    "noUnusedParameters": true, // 🟡 保留但允许 _prefix
+    "noUnusedLocals": true, // 🟡 或改为 warning
+    /* 根据项目决定 */
+    "noPropertyAccessFromIndexSignature": false, // 已是 false
+    "allowUnusedLabels": false, // label 很少用
 
     /* Path mapping */
     "baseUrl": ".",

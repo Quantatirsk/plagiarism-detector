@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, cast
 
 from backend.db.models import DocumentChunk
 from backend.services.types import SpanPayload
@@ -77,10 +77,10 @@ class MatchAggregator:
             }
             self._records[key] = record
 
-        record["final_score"] = self._max_optional(record["final_score"], state.final_score)
-        record["semantic_score"] = self._max_optional(record["semantic_score"], state.semantic_score)
-        record["cross_score"] = self._max_optional(record["cross_score"], state.cross_score)
-        record["match_count"] = int(record["match_count"]) + 1
+        record["final_score"] = self._max_optional(cast(Optional[float], record["final_score"]), state.final_score)
+        record["semantic_score"] = self._max_optional(cast(Optional[float], record["semantic_score"]), state.semantic_score)
+        record["cross_score"] = self._max_optional(cast(Optional[float], record["cross_score"]), state.cross_score)
+        record["match_count"] = cast(int, record["match_count"]) + 1
 
         span_set: set = record["span_set"]  # type: ignore[assignment]
         doc_span_set: set = record["doc_span_set"]  # type: ignore[assignment]
@@ -249,11 +249,11 @@ class MatchAggregator:
                 entry[field] = round(value, ndigits)
 
     def _sort_key(self, item: Dict[str, object]) -> tuple[int, int, float]:
-        left_chunk = self.left_map[item["left_chunk_id"]]
-        right_chunk = self.right_map[item["right_chunk_id"]]
+        left_chunk = self.left_map[cast(int, item["left_chunk_id"])]
+        right_chunk = self.right_map[cast(int, item["right_chunk_id"])]
         left_anchor = left_chunk.start_pos
         right_anchor = right_chunk.start_pos
-        score = float(item.get("final_score") or 0.0)
+        score = float(cast(Optional[float], item.get("final_score")) or 0.0)
         return (left_anchor, right_anchor, -score)
 
 

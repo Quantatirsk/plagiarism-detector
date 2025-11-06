@@ -3,10 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np
 from dataclasses import dataclass
-from functools import lru_cache
 
 from backend.services.base_service import BaseService, singleton
 from backend.core.logging import get_logger
@@ -278,7 +277,7 @@ class MinHashFilterStage(BaseService):
 
         return similar_pairs
 
-    def get_stats(self) -> Dict[str, any]:
+    def get_stats(self) -> Dict[str, Any]:
         """Get statistics about the MinHash processor."""
         self._ensure_initialized()
 

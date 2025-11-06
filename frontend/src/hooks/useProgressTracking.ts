@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { plagiarismApi } from '@/api/plagiarismApi';
-import type { ProgressTask, ProgressStatus } from '@/api/plagiarismApi';
+import type { ProgressTask } from '@/api/plagiarismApi';
 
 interface UseProgressTrackingOptions {
   pollingInterval?: number;

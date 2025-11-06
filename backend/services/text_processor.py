@@ -3,7 +3,7 @@
 使用 spaCy 进行中英文句子分割，支持混合语言文档
 """
 import re
-from typing import List, Tuple, Dict, Optional
+from typing import Any, List, Tuple, Dict, Optional
 import hashlib
 from functools import lru_cache
 import spacy
@@ -137,7 +137,7 @@ class TextProcessor(BaseService):
             cache_key += str(sorted(params.items()))
         return hashlib.md5(cache_key.encode('utf-8')).hexdigest()
 
-    def _get_from_cache(self, cache_key: str) -> Optional[any]:
+    def _get_from_cache(self, cache_key: str) -> Optional[Any]:
         """从缓存获取结果"""
         if cache_key in self._cache:
             # Linus: "Data structures" - 移到末尾实现 LRU
@@ -145,7 +145,7 @@ class TextProcessor(BaseService):
             return self._cache[cache_key]
         return None
 
-    def _add_to_cache(self, cache_key: str, result: any) -> None:
+    def _add_to_cache(self, cache_key: str, result: Any) -> None:
         """添加到缓存，实现真正的 LRU 策略"""
         if cache_key in self._cache:
             # 更新已存在的项并移到末尾
@@ -520,7 +520,7 @@ class TextProcessor(BaseService):
         texts: List[str],
         min_length: int = 20,
         max_chars: int = 600,
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """批量处理文档，返回段落和句子分割结果"""
         self._ensure_initialized()
         results = []
