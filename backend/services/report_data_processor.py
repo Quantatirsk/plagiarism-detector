@@ -491,14 +491,22 @@ class ReportDataProcessor(BaseService):
         doc_a_id: str | int,
         doc_b_id: str | int
     ) -> PairReportResponse | None:
-        """获取特定文档对的比较结果"""
+        """获取特定文档对的比较结果（支持双向查找）"""
         left_id = self._parse_int_id(doc_a_id, "document")
         right_id = self._parse_int_id(doc_b_id, "document")
 
+        # 支持双向查找：(A,B) 或 (B,A)
         stmt = (
             select(ComparePair)
-            .where(col(ComparePair.left_document_id) == left_id)
-            .where(col(ComparePair.right_document_id) == right_id)
+            .where(
+                (
+                    (col(ComparePair.left_document_id) == left_id) &
+                    (col(ComparePair.right_document_id) == right_id)
+                ) | (
+                    (col(ComparePair.left_document_id) == right_id) &
+                    (col(ComparePair.right_document_id) == left_id)
+                )
+            )
             .order_by(col(ComparePair.created_at).desc())
         )
         result = await session.exec(stmt)

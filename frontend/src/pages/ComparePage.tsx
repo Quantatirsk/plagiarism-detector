@@ -117,12 +117,12 @@ export default function ComparePage() {
   // ==================== 交互函数 ====================
 
   const handleBack = () => {
-    // 返回工作区
-    navigate('/workspace');
+    // 返回比对任务页
+    navigate('/comparison/tasks');
   };
 
   const handleSwitchPair = (newPairId: number) => {
-    navigate(`/compare/${newPairId}`);
+    navigate(`/comparison/results/${newPairId}`);
   };
 
   // ==================== 渲染 ====================

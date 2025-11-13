@@ -9,7 +9,7 @@ from langdetect import detect
 class ParagraphOptimizer:
     """段落优化器 - 提供文本清理和格式化功能"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the paragraph optimizer."""
         pass
     
@@ -169,7 +169,7 @@ class ParagraphOptimizer:
 
         return '\n'.join(result)
 
-    def should_start_new_paragraph(self, line: str, current_paragraph: list) -> bool:
+    def should_start_new_paragraph(self, line: str, current_paragraph: list[Any]) -> bool:
         """
         判断一行是否应该开始新段落。
 

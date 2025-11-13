@@ -11,11 +11,11 @@ import { useState, useEffect } from 'react';
 import { Layout, Menu, Button, Drawer, Tooltip } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
-  ProjectOutlined,
-  FileTextOutlined,
+  DashboardOutlined,
   MenuOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import { designSystem } from '@/styles/DesignSystem';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -49,32 +49,30 @@ export default function MainLayout() {
   // 菜单项配置
   const menuItems = [
     {
-      key: '/workspace',
-      icon: <ProjectOutlined />,
-      label: '项目工作区',
+      key: '/dashboard',
+      icon: <DashboardOutlined />,
+      label: '仪表板',
     },
     {
-      key: '/reports',
-      icon: <FileTextOutlined />,
-      label: '报告中心',
+      key: '/module',
+      icon: <AppstoreOutlined />,
+      label: '模块系统',
     },
   ];
 
-  // 智能匹配选中项（支持子路由）
-  const selectedKey = (() => {
-    const path = location.pathname;
-    if (path.startsWith('/workspace')) return '/workspace';
-    if (path === '/' || path === '') return '/workspace';
-    return path;
-  })();
+  // 处理模块系统子路由的高亮
+  const getSelectedKey = () => {
+    if (location.pathname === '/') return '/dashboard';
+    if (location.pathname.startsWith('/module')) return '/module';
+    return location.pathname;
+  };
+  const selectedKey = getSelectedKey();
 
   // 根据路由获取页面标题
   const getPageTitle = () => {
-    const path = location.pathname;
-    if (path.startsWith('/workspace')) return '项目工作区';
-    if (path === '/' || path === '') return '项目工作区';
+    const path = location.pathname === '/' ? '/dashboard' : location.pathname;
     const menuItem = menuItems.find(item => item.key === path);
-    return menuItem?.label || '论文查重系统';
+    return menuItem?.label || 'Ant Design Template';
   };
 
   const menuContent = (
@@ -102,7 +100,7 @@ export default function MainLayout() {
             transitionDelay: collapsed ? '0ms' : '150ms', // 展开时延迟显示文字
           }}
         >
-          查重系统
+          Ant Design
         </span>
         <Tooltip
           title={collapsed ? '展开菜单' : '折叠菜单'}

@@ -51,6 +51,7 @@
   border-collapse: collapse;
   width: 100%;
   table-layout: fixed;
+  font-size: inherit; /* 继承外层容器的字号 */
 }
 
 .markdown-renderer th,
@@ -60,6 +61,7 @@
   text-align: left;
   white-space: normal;
   word-break: break-word;
+  font-size: inherit; /* 继承表格的字号 */
 }
 
 .markdown-renderer thead {

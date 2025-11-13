@@ -1,4 +1,4 @@
-import { ConfigProvider, theme } from 'antd';
+import { ConfigProvider, theme, App as AntdApp } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
@@ -103,7 +103,9 @@ function App() {
         },
       }}
       >
-        <RouterProvider router={router} />
+        <AntdApp>
+          <RouterProvider router={router} />
+        </AntdApp>
       </ConfigProvider>
     </>
   );

@@ -1,6 +1,7 @@
 """Shared dataclasses used across services."""
 from __future__ import annotations
 
+from typing import Any
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -24,7 +25,7 @@ class CandidatePayload:
     right_chunk_id: int
     rough_method: str
     rough_score: float
-    extras: dict | None = None
+    extras: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)
@@ -35,6 +36,6 @@ class EvidencePayload:
     semantic_score: float | None
     alignment_ratio: float | None
     final_score: float | None
-    extra_json: dict | None = None
+    extra_json: dict[str, Any] | None = None
     spans: Sequence[SpanPayload] | None = None
 

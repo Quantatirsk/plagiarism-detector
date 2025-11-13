@@ -4,7 +4,7 @@
 单一职责：定义文件扩展名到解析器的映射关系
 符合 Linux 哲学：配置与代码分离
 """
-from typing import Union
+from typing import Union, Any
 
 # 专用解析器映射（优先级高）
 SPECIALIZED_PARSERS = {
@@ -235,7 +235,7 @@ EXTENSIONLESS_TEXT_FILES = [
     'dependencies',
 ]
 
-def get_parser_map():
+def get_parser_map() -> Any:
     """
     获取完整的解析器映射
     
@@ -253,7 +253,7 @@ def get_parser_map():
     
     return parser_map
 
-def is_extensionless_text_file(filename):
+def is_extensionless_text_file(filename: str) -> Any:
     """
     检查是否是无扩展名的文本文件
     
@@ -265,7 +265,7 @@ def is_extensionless_text_file(filename):
     """
     return filename.lower() in EXTENSIONLESS_TEXT_FILES
 
-def get_parser_for_file(file_path):
+def get_parser_for_file(file_path: str) -> Any:
     """
     根据文件路径获取合适的解析器
     
@@ -293,7 +293,7 @@ def get_parser_for_file(file_path):
     return None
 
 # 统计信息
-def get_format_stats():
+def get_format_stats() -> Any:
     """获取格式支持的统计信息"""
     parser_map = get_parser_map()
     

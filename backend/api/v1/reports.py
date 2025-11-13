@@ -2,6 +2,7 @@
 报告生成API端点 - 支持文档、对比和项目级报告生成
 """
 import json
+from typing import Any, AsyncIterator
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
@@ -59,7 +60,7 @@ def get_report_generator() -> ReportGeneratorService:
 async def generate_document_report(
     request: DocumentReportRequest,
     report_generator: ReportGeneratorService = Depends(get_report_generator)
-):
+) -> Any:
     """
     生成单个文档的抄袭检测报告
 
@@ -84,7 +85,7 @@ async def generate_document_report(
 
         if request.stream_response:
             # 流式响应
-            async def generate():
+            async def generate() -> AsyncIterator[str]:
                 try:
                     from typing import cast, AsyncGenerator as AG
                     generator = await report_generator.generate_report(generation_request, stream=True)
@@ -124,7 +125,7 @@ async def generate_document_report(
 async def generate_comparison_report(
     request: ComparisonReportRequest,
     report_generator: ReportGeneratorService = Depends(get_report_generator)
-):
+) -> Any:
     """
     生成两个文档间的详细对比分析报告
 
@@ -147,7 +148,7 @@ async def generate_comparison_report(
         )
 
         if request.stream_response:
-            async def generate():
+            async def generate() -> AsyncIterator[str]:
                 try:
                     from typing import cast, AsyncGenerator as AG
                     generator = await report_generator.generate_report(generation_request, stream=True)
@@ -210,7 +211,7 @@ async def generate_project_report(
         )
 
         if request.stream_response:
-            async def generate():
+            async def generate() -> AsyncIterator[str]:
                 try:
                     from typing import cast, AsyncGenerator as AG
                     generator = await report_generator.generate_report(generation_request, stream=True)

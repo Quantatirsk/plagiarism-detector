@@ -18,8 +18,8 @@ from typing import Optional
 # 配置日志记录器
 logger = logging.getLogger(__name__)
 try:
-    import dashscope
-    from dashscope.audio.asr import Recognition, RecognitionCallback, RecognitionResult
+    import dashscope  # type: ignore
+    from dashscope.audio.asr import Recognition, RecognitionCallback, RecognitionResult  # type: ignore
     dashscope_available = True
 except ImportError as e:
     logger.error(f"Warning: dashscope import error: {e}")
@@ -91,7 +91,7 @@ class ASRService:
 
             # 使用Recognition进行实时识别
             class ASRCallback(RecognitionCallback):  # type: ignore[misc, valid-type]
-                def __init__(self):
+                def __init__(self) -> None:
                     self.full_text = []
 
                 def on_open(self) -> None:
@@ -196,7 +196,7 @@ class ASRService:
 
             # 使用Recognition进行高级识别
             class AdvancedASRCallback(RecognitionCallback):  # type: ignore[misc, valid-type]
-                def __init__(self):
+                def __init__(self) -> None:
                     self.sentences = []
                     self.words = []
                     self.full_text = []

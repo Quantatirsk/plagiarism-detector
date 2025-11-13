@@ -22,28 +22,28 @@ class ReportTemplateService(BaseService):
         self.templates["document_zh"] = ReportTemplate(
             type=ReportType.DOCUMENT,
             language="zh",
-            system_prompt="""你是招采合规分析师，专注于识别投标文件雷同和串标风险。
+            system_prompt="""你是文档相似度分析专家，专注于识别文档内容的重复和相似模式。
 
-核心任务：基于数据生成简洁、精准的风险分析报告。
+核心任务：基于数据生成简洁、精准的相似度分析报告。
 
 输出要求：
 1. **简洁为先**：总字数控制在 800-1200 字以内
 2. **数据驱动**：直接引用数据支撑结论，避免空泛描述
-3. **聚焦关键**：只分析高风险点和核心发现，不重复罗列已有数据
-4. **结论明确**：风险等级、主要问题、建议行动要清晰可执行
-5. **招采话术**：使用"投标人"、"评标"、"串标迹象"等行业术语""",
-            user_prompt_template="""## 任务：生成投标文件雷同性分析报告
+3. **聚焦关键**：只分析高相似度区域和核心发现，不重复罗列已有数据
+4. **结论明确**：相似度评级、主要问题、建议行动要清晰可执行
+5. **客观中立**：使用"文档"、"内容片段"、"相似性"等中性术语""",
+            user_prompt_template="""## 任务：生成文档相似度分析报告
 
 ### 文档基础信息
 - 文件名称：{document_title}
 - 综合相似度：{total_similarity_score:.1%}
-- 风险等级：{risk_level}
+- 相似度等级：{risk_level}
 - 对比来源数量：{sources_count}
 
 ### 相似度来源数据
 {sources_analysis}
 
-### 重点雷同片段
+### 重点相似片段
 {match_details}
 
 ### 统计数据
@@ -53,18 +53,18 @@ class ReportTemplateService(BaseService):
 
 ### 报告结构（总字数 ≤ 1200 字）
 
-**1. 风险概述**（200字以内）
-- 一句话总结风险水平和核心问题
-- 关键数据点：相似度、主要来源、高风险片段数量
+**1. 相似度概述**（200字以内）
+- 一句话总结相似度水平和核心特征
+- 关键数据点：相似度分数、主要来源、高相似片段数量
 
 **2. 关键发现**（400字以内）
-- 列举 TOP 3 高相似度来源，说明风险含义
-- 分析重点雷同片段的特征（技术方案/报价/资质等）
-- 标注最具风险的内容类型
+- 列举 TOP 3 高相似度来源，说明相似程度和模式
+- 分析重点相似片段的特征（内容类型、结构、语言风格等）
+- 标注最具代表性的相似内容类型
 
-**3. 合规建议**（300字以内）
-- 针对高风险点的具体处理建议（要求澄清、现场核查、专家评审等）
-- 标注需要重点关注的对比文件
+**3. 分析建议**（300字以内）
+- 针对高相似度区域的具体分析建议（深度检查、交叉验证等）
+- 标注需要重点关注的对比文档
 
 ---
 
@@ -72,32 +72,32 @@ class ReportTemplateService(BaseService):
 - 直接陈述结论，不要重复原始数据
 - 每个发现必须引用具体数据支撑
 - 建议要具体可执行，避免空话""",
-            sections=["executive_summary", "risk_assessment", "source_analysis", "key_matches", "recommendations"],
+            sections=["executive_summary", "similarity_assessment", "source_analysis", "key_matches", "recommendations"],
             chart_configs={
                 "similarity_pie": {"type": "pie", "title": "相似度来源分布"},
-                "risk_gauge": {"type": "gauge", "title": "风险评估", "max": 100}
+                "similarity_gauge": {"type": "gauge", "title": "相似度评估", "max": 100}
             }
         )
 
         self.templates["document_en"] = ReportTemplate(
             type=ReportType.DOCUMENT,
             language="en",
-            system_prompt="""You are a procurement compliance analyst specializing in tender collusion and bid-rigging detection.
+            system_prompt="""You are a document similarity analysis expert specializing in identifying content duplication and similarity patterns.
 
-Core Task: Generate concise, data-driven risk analysis reports.
+Core Task: Generate concise, data-driven similarity analysis reports.
 
 Output Requirements:
 1. **Brevity First**: Total word count 800-1200 words
 2. **Data-Driven**: Support conclusions with specific data, avoid generic statements
-3. **Focus on Key Issues**: Analyze only high-risk findings, don't repeat raw data
-4. **Clear Conclusions**: Risk level, main issues, and actionable recommendations
-5. **Industry Language**: Use "bidder", "evaluation", "collusion indicators" terminology""",
-            user_prompt_template="""## Task: Generate Tender Similarity Analysis Report
+3. **Focus on Key Issues**: Analyze only high-similarity areas and core findings, don't repeat raw data
+4. **Clear Conclusions**: Similarity rating, main issues, and actionable recommendations
+5. **Neutral Language**: Use "document", "content segment", "similarity" terminology""",
+            user_prompt_template="""## Task: Generate Document Similarity Analysis Report
 
 ### Document Information
 - Document Title: {document_title}
 - Overall Similarity: {total_similarity_score:.1%}
-- Risk Level: {risk_level}
+- Similarity Level: {risk_level}
 - Comparison Sources: {sources_count}
 
 ### Similarity Source Data
@@ -113,17 +113,17 @@ Output Requirements:
 
 ### Report Structure (Total ≤ 1200 words)
 
-**1. Risk Overview** (≤200 words)
-- One-sentence summary of risk level and core issues
-- Key data points: similarity score, main sources, high-risk segment count
+**1. Similarity Overview** (≤200 words)
+- One-sentence summary of similarity level and core characteristics
+- Key data points: similarity score, main sources, high-similarity segment count
 
 **2. Key Findings** (≤400 words)
-- List TOP 3 high-similarity sources with risk implications
-- Analyze characteristics of critical segments (technical/pricing/qualification)
-- Identify most risky content types
+- List TOP 3 high-similarity sources with similarity patterns
+- Analyze characteristics of critical segments (content type, structure, language style)
+- Identify most representative similarity content types
 
-**3. Compliance Recommendations** (≤300 words)
-- Specific actions for high-risk items (clarification, site verification, expert review)
+**3. Analysis Recommendations** (≤300 words)
+- Specific recommendations for high-similarity areas (deep inspection, cross-validation)
 - Flag comparison documents requiring special attention
 
 ---
@@ -132,10 +132,10 @@ Output Requirements:
 - State conclusions directly, don't repeat raw data
 - Every finding must cite specific supporting data
 - Recommendations must be specific and actionable""",
-            sections=["executive_summary", "risk_assessment", "source_analysis", "key_matches", "recommendations"],
+            sections=["executive_summary", "similarity_assessment", "source_analysis", "key_matches", "recommendations"],
             chart_configs={
                 "similarity_pie": {"type": "pie", "title": "Similarity Source Distribution"},
-                "risk_gauge": {"type": "gauge", "title": "Risk Assessment", "max": 100}
+                "similarity_gauge": {"type": "gauge", "title": "Similarity Assessment", "max": 100}
             }
         )
 
@@ -143,30 +143,30 @@ Output Requirements:
         self.templates["comparison_zh"] = ReportTemplate(
             type=ReportType.COMPARISON,
             language="zh",
-            system_prompt="""你是招采对比分析专家，专注识别投标文件间的串标迹象和协同编制风险。
+            system_prompt="""你是文档对比分析专家，专注识别文档间的相似模式和内容关联。
 
-核心任务：基于双向相似度数据，快速判断两份标书的关联关系。
+核心任务：基于双向相似度数据，快速判断两份文档的关联程度。
 
 输出要求：
 1. **精准简洁**：总字数控制在 600-1000 字以内
-2. **结论优先**：开篇直接给出串标风险判断
+2. **结论优先**：开篇直接给出相似度判断
 3. **数据说话**：用双向相似度、独有内容占比等数据支撑结论
-4. **聚焦异常**：重点分析不对称相似度和高度雷同片段
-5. **可执行建议**：明确告知是否需要进一步调查或处理""",
-            user_prompt_template="""## 任务：生成双标对比分析报告
+4. **聚焦异常**：重点分析不对称相似度和高度相似片段
+5. **可执行建议**：明确告知是否需要进一步分析或验证""",
+            user_prompt_template="""## 任务：生成文档对比分析报告
 
 ### 对比文档
 - 文档 A：{document_a_title}
 - 文档 B：{document_b_title}
 
 ### 相似度指标
-- A→B 雷同度：{similarity_a_to_b:.1%}
-- B→A 雷同度：{similarity_b_to_a:.1%}
+- A→B 相似度：{similarity_a_to_b:.1%}
+- B→A 相似度：{similarity_b_to_a:.1%}
 - 共同内容占比：{common_similarity:.1%}
 - A 独有内容：{unique_a_ratio:.1%}
 - B 独有内容：{unique_b_ratio:.1%}
 
-### 重点雷同片段
+### 重点相似片段
 {match_details}
 
 ### 并排对照数据
@@ -176,24 +176,24 @@ Output Requirements:
 
 ### 报告结构（总字数 ≤ 1000 字）
 
-**1. 关联关系判断**（150字以内）
-- 一句话结论：是否存在串标或协同编制迹象
-- 关键依据：相似度数据异常情况
+**1. 相似关系判断**（150字以内）
+- 一句话结论：相似程度和主要特征
+- 关键依据：相似度数据的显著特征
 
 **2. 核心发现**（400字以内）
-- 分析双向相似度差异（如 A→B 高但 B→A 低，说明可能存在抄袭方向）
-- 标注高度雷同片段的位置和内容类型
+- 分析双向相似度差异（如 A→B 高但 B→A 低，说明可能存在内容复用方向性）
+- 标注高度相似片段的位置和内容类型
 - 评估独有内容占比的合理性
 
-**3. 风险评估与建议**（200字以内）
-- 明确风险等级（低/中/高/严重）
-- 给出具体处理建议（约谈澄清、要求说明、废标等）
+**3. 相似度评估与建议**（200字以内）
+- 明确相似度等级（低/中/高/极高）
+- 给出具体分析建议（深度检查、内容溯源、交叉验证等）
 
 ---
 
 **输出规范**：
 - 避免重复罗列原始数据
-- 重点解释数据背后的风险含义
+- 重点解释数据背后的相似模式
 - 建议要有可操作性""",
             sections=["comparison_summary", "similarity_matrix", "content_distribution", "key_matches", "pattern_analysis", "conclusions"],
             chart_configs={
@@ -206,32 +206,32 @@ Output Requirements:
         self.templates["project_zh"] = ReportTemplate(
             type=ReportType.PROJECT,
             language="zh",
-            system_prompt="""你是招采合规顾问，负责项目级雷同风险全局分析。
+            system_prompt="""你是文档集合分析专家，负责项目级相似度全局分析。
 
-核心任务：从项目整体视角，快速识别系统性风险和重点监控对象。
+核心任务：从项目整体视角，快速识别系统性模式和重点关注对象。
 
 输出要求：
 1. **宏观聚焦**：总字数控制在 1000-1500 字以内
-2. **关键优先**：突出高风险文件和异常模式，忽略正常范围内的数据
+2. **关键优先**：突出高相似度文档和异常模式，忽略正常范围内的数据
 3. **数据洞察**：从统计分布中提炼规律，不要简单复述数字
-4. **风险分层**：明确哪些是重点风险、哪些是一般关注
-5. **决策导向**：告知项目业主或监管方应采取什么行动""",
-            user_prompt_template="""## 任务：生成项目级雷同风险报告
+4. **分层分析**：明确哪些是重点关注、哪些是一般关注
+5. **决策导向**：告知项目负责人应采取什么行动""",
+            user_prompt_template="""## 任务：生成项目级相似度分析报告
 
 ### 项目概况
 - 项目名称：{project_name}
-- 投标文件总数：{total_documents}
+- 文档总数：{total_documents}
 - 比对总数：{total_comparisons}
-- 平均雷同度：{average_similarity:.1%}
-- 高风险文件数：{high_risk_count}
+- 平均相似度：{average_similarity:.1%}
+- 高相似度文档数：{high_risk_count}
 
 ### 统计分析
 {statistics_analysis}
 
-### 雷同度分布
+### 相似度分布
 {similarity_distribution}
 
-### 高风险文件
+### 高相似度文档
 {high_risk_documents}
 
 ### 异常检测
@@ -244,32 +244,32 @@ Output Requirements:
 
 ### 报告结构（总字数 ≤ 1500 字）
 
-**1. 项目风险总览**（250字以内）
-- 一句话总结项目整体风险水平
-- 关键指标：高风险文件占比、平均雷同度、异常数量
+**1. 项目相似度总览**（250字以内）
+- 一句话总结项目整体相似度水平
+- 关键指标：高相似度文档占比、平均相似度、异常数量
 
-**2. 重点风险标的**（500字以内）
-- 列举 TOP 5 高风险文件，说明具体风险点
-- 标注是否存在集中雷同或关联串标迹象
+**2. 重点关注文档**（500字以内）
+- 列举 TOP 5 高相似度文档，说明具体特征
+- 标注是否存在集中相似或内容复用模式
 - 引用具体相似度数据和异常特征
 
 **3. 模式与趋势**（350字以内）
-- 分析雷同度分布特征（是否存在集中高峰、异常离群值）
-- 识别可能的协同编制或模板复用模式
+- 分析相似度分布特征（是否存在集中高峰、异常离群值）
+- 识别可能的内容复用或模板使用模式
 - 评估相似网络中的核心节点
 
 **4. 处理建议**（250字以内）
-- 明确哪些文件需要立即审查或废标
-- 哪些需要进一步调查或约谈
-- 项目层面的改进措施（加强资格预审、引入第三方核查等）
+- 明确哪些文档需要优先检查
+- 哪些需要进一步分析或验证
+- 项目层面的改进措施（优化文档管理、加强原创性检查等）
 
 ---
 
 **输出规范**：
 - 避免逐条罗列统计数据，提炼关键洞察
-- 重点文件要有明确名称和风险评级
+- 重点文档要有明确名称和相似度评级
 - 建议要分轻重缓急""",
-            sections=["project_summary", "overall_assessment", "statistical_analysis", "high_risk_cases", "behavior_patterns", "anomaly_detection", "recommendations"],
+            sections=["project_summary", "overall_assessment", "statistical_analysis", "high_similarity_cases", "content_patterns", "anomaly_detection", "recommendations"],
             chart_configs={
                 "similarity_distribution": {"type": "histogram", "title": "相似度分布"},
                 "network_graph": {"type": "network", "title": "文档关系网络"},

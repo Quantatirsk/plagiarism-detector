@@ -3,7 +3,7 @@ OCR 服务配置管理
 """
 
 import os
-from typing import Optional
+from typing import Optional, Any
 
 # 导入配置加载器确保环境变量已加载
 try:
@@ -17,7 +17,7 @@ except ImportError:
 class OCRConfig:
     """OCR 服务配置类 - MinerU API"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # MinerU 服务基础配置
         self.base_url: str = os.getenv("OCR_BASE_URL", "http://home.teea.cn:7000")
         self.api_key: Optional[str] = os.getenv("OCR_API_KEY")  # 如果需要API Key
@@ -51,11 +51,11 @@ class OCRConfig:
         self.debug_mode: bool = os.getenv("OCR_DEBUG", "false").lower() == "true"
     
     @property
-    def timeout_tuple(self) -> tuple:
+    def timeout_tuple(self) -> tuple[Any, ...]:
         """获取超时配置元组（兼容性保留，MinerU 使用单一超时）"""
         return (self.timeout, self.timeout)
     
-    def get_headers(self) -> dict:
+    def get_headers(self) -> dict[str, Any]:
         """获取请求头"""
         headers = {
             'User-Agent': 'Refly-AI OCR Client/1.0'
@@ -114,7 +114,7 @@ class OCRConfig:
         file_ext = Path(file_path).suffix.lower()
         return file_ext in self.supported_extensions
     
-    def get_cache_config(self) -> dict:
+    def get_cache_config(self) -> dict[str, Any]:
         """获取缓存配置"""
         return {
             'enabled': self.cache_enabled,

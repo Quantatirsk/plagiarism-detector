@@ -8,15 +8,15 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Card, Segmented, message, Statistic, Row, Col } from 'antd';
-import { FileTextOutlined, SwapOutlined, FolderOutlined } from '@ant-design/icons';
+import { Card, Segmented, message, Statistic } from 'antd';
+import { FileTextOutlined, SwapOutlined } from '@ant-design/icons';
 import PageLayout from '@/layout/PageLayout';
 import { ReportGenerator, type ReportConfig } from '@/components/reports/ReportGenerator';
 import { ReportViewer, type ReportData, type ReportProgress } from '@/components/reports/ReportViewer';
-import { useProjects, useDocuments } from '@/hooks/useData';
+import { useDocuments } from '@/hooks/useData';
 import { designSystem } from '@/styles/DesignSystem';
 
-type ReportType = 'document' | 'comparison' | 'project';
+type ReportType = 'document' | 'comparison';
 
 export default function ReportsPage() {
   // ==================== 状态管理 ====================
@@ -25,7 +25,6 @@ export default function ReportsPage() {
   const [reportProgress, setReportProgress] = useState<ReportProgress | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const { data: projects } = useProjects();
   const { data: documents } = useDocuments();
   const { data: models } = { data: [
     { id: 'google/gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash' },
@@ -42,13 +41,6 @@ export default function ReportsPage() {
       title: doc.title || doc.filename || `文档 #${doc.id}`
     }));
   }, [documents]);
-
-  const availableProjects = useMemo(() => {
-    return (projects || []).map(proj => ({
-      id: String(proj.id),
-      name: proj.name || `项目 #${proj.id}`
-    }));
-  }, [projects]);
 
   const availableModels = useMemo(() => {
     return (models || []).map(model => ({
@@ -78,12 +70,12 @@ export default function ReportsPage() {
       setCurrentReport({
         id: 'temp',
         type: config.type,
-        title: `${config.type === 'document' ? '文档' : config.type === 'comparison' ? '对比' : '项目'}报告`,
+        title: `${config.type === 'document' ? '文档抄袭检测' : '文档对比分析'}报告`,
         summary: '报告已生成',
         content: { full_content: '报告内容' },
         data: {},
         generated_at: new Date().toISOString(),
-        language: config.language,
+        language: 'zh',
         export_formats: ['docx']
       });
 
@@ -113,19 +105,14 @@ export default function ReportsPage() {
         onChange={(value) => setReportType(value as ReportType)}
         options={[
           {
-            label: '文档报告',
+            label: '文档抄袭检测',
             value: 'document',
             icon: <FileTextOutlined />
           },
           {
-            label: '对比报告',
+            label: '文档对比分析',
             value: 'comparison',
             icon: <SwapOutlined />
-          },
-          {
-            label: '项目报告',
-            value: 'project',
-            icon: <FolderOutlined />
           }
         ]}
       />
@@ -164,16 +151,6 @@ export default function ReportsPage() {
               </ul>
             </>
           )}
-          {reportType === 'project' && (
-            <>
-              <p>对项目内所有文档进行宏观分析：</p>
-              <ul style={{ paddingLeft: 20, margin: `${designSystem.spacing[1]} 0` }}>
-                <li>整体相似度分布</li>
-                <li>异常文档识别</li>
-                <li>网络关系图谱</li>
-              </ul>
-            </>
-          )}
         </div>
       </Card>
 
@@ -184,24 +161,12 @@ export default function ReportsPage() {
           borderRadius: designSystem.borderRadius.lg,
         }}
       >
-        <Row gutter={[8, 8]}>
-          <Col span={24}>
-            <Statistic
-              title="可用文档"
-              value={availableDocuments.length}
-              prefix={<FileTextOutlined />}
-              valueStyle={{ fontSize: designSystem.typography.fontSize.lg }}
-            />
-          </Col>
-          <Col span={24}>
-            <Statistic
-              title="可用项目"
-              value={availableProjects.length}
-              prefix={<FolderOutlined />}
-              valueStyle={{ fontSize: designSystem.typography.fontSize.lg }}
-            />
-          </Col>
-        </Row>
+        <Statistic
+          title="可用文档"
+          value={availableDocuments.length}
+          prefix={<FileTextOutlined />}
+          valueStyle={{ fontSize: designSystem.typography.fontSize.lg }}
+        />
       </Card>
     </>
   );
@@ -250,7 +215,7 @@ export default function ReportsPage() {
   // 底部状态栏
   const bottomBar = (
     <>
-      <span>报告类型: {reportType === 'document' ? '文档报告' : reportType === 'comparison' ? '对比报告' : '项目报告'}</span>
+      <span>报告类型: {reportType === 'document' ? '文档抄袭检测' : '文档对比分析'}</span>
       {isGenerating && <span>生成中...</span>}
     </>
   );
@@ -280,14 +245,11 @@ export default function ReportsPage() {
             onGenerate={handleGenerateReport}
             isGenerating={isGenerating}
             availableDocuments={availableDocuments}
-            availableProjects={availableProjects}
             availableModels={availableModels}
           />
         ) : (
           <ReportViewer
             report={currentReport}
-            progress={reportProgress || undefined}
-            isGenerating={isGenerating}
           />
         )}
       </div>

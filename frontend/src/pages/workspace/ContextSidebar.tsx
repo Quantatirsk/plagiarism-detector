@@ -53,7 +53,7 @@ export default function ContextSidebar() {
       const pairs = await plagiarismApi.listPairs(selectedTaskId);
       if (pairs.length > 0) {
         // 导航到第一个pair的全屏对比页
-        navigate(`/compare/${pairs[0].id}`);
+        navigate(`/comparison/results/${pairs[0].id}`);
       }
     } catch (error) {
       console.error('Failed to load pairs:', error);

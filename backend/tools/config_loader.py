@@ -7,7 +7,7 @@
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 from dotenv import load_dotenv
 import logging
 
@@ -133,7 +133,7 @@ def load_tools_config(environment: Optional[str] = None, force_reload: bool = Fa
     return ToolsConfigLoader.load_config(environment, force_reload)
 
 # 在模块导入时自动加载配置
-def auto_load_config():
+def auto_load_config() -> Any:
     """自动加载配置（仅在作为模块导入时执行一次）"""
     # 检查是否已经通过主应用加载了配置
     # 如果ENVIRONMENT已设置且有其他配置，说明主应用已加载

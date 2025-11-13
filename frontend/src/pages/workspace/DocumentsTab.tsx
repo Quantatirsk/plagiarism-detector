@@ -129,7 +129,7 @@ export default function DocumentsTab({ project }: DocumentsTabProps) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: designSystem.spacing[2],
+        gap: designSystem.spacing[1],
         height: '100%',
       }}
     >

@@ -14,6 +14,12 @@ const WorkspacePage = lazy(() => import('@/pages/WorkspacePage'));
 const ReportsPage = lazy(() => import('@/pages/ReportsPage'));
 const ComparePage = lazy(() => import('@/pages/ComparePage'));
 
+// 文档比对系统页面
+const ComparisonSystemPage = lazy(() => import('@/pages/comparison/ComparisonSystemPage'));
+const ProjectManagementPage = lazy(() => import('@/pages/comparison/ProjectManagementPage'));
+const TaskManagementPage = lazy(() => import('@/pages/comparison/TaskManagementPage'));
+const ReportCenterPage = lazy(() => import('@/pages/comparison/ReportCenterPage'));
+
 // ==================== 布局组件 ====================
 
 import MainLayout from '@/layout/MainLayout';
@@ -38,9 +44,48 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="/workspace" replace />,
+        element: <Navigate to="/comparison" replace />,
       },
-      // 新的统一工作区
+      // 文档比对系统（新架构）
+      {
+        path: 'comparison',
+        element: (
+          <Suspense fallback={<PageLoading />}>
+            <ComparisonSystemPage />
+          </Suspense>
+        ),
+        children: [
+          {
+            index: true,
+            element: <Navigate to="/comparison/projects" replace />,
+          },
+          {
+            path: 'projects',
+            element: (
+              <Suspense fallback={<PageLoading />}>
+                <ProjectManagementPage />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'tasks',
+            element: (
+              <Suspense fallback={<PageLoading />}>
+                <TaskManagementPage />
+              </Suspense>
+            ),
+          },
+          {
+            path: 'reports',
+            element: (
+              <Suspense fallback={<PageLoading />}>
+                <ReportCenterPage />
+              </Suspense>
+            ),
+          },
+        ],
+      },
+      // 旧路由（保留用于向后兼容，后续可删除）
       {
         path: 'workspace',
         children: [
@@ -62,7 +107,6 @@ export const router = createBrowserRouter([
           },
         ],
       },
-      // 报告中心（独立功能）
       {
         path: 'reports',
         element: (
@@ -73,7 +117,16 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  // 全屏对比页面（脱离 MainLayout）
+  // 全屏对比页面（独立路由，脱离 MainLayout）
+  {
+    path: '/comparison/results/:pairId',
+    element: (
+      <Suspense fallback={<PageLoading />}>
+        <ComparePage />
+      </Suspense>
+    ),
+  },
+  // 兼容旧对比页路由
   {
     path: '/compare/:pairId',
     element: (
@@ -84,6 +137,6 @@ export const router = createBrowserRouter([
   },
   {
     path: '*',
-    element: <Navigate to="/workspace" replace />,
+    element: <Navigate to="/comparison" replace />,
   },
 ]);

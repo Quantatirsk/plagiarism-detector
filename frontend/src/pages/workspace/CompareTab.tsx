@@ -7,13 +7,13 @@ import { useEffect, useState } from 'react';
 import { Card, Row, Col, Spin, Empty, Progress, Tag } from 'antd';
 import { EyeOutlined, FileTextOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useComparisonStore } from '@/store/comparisonStore';
 import { plagiarismApi, type ComparePairSummary, type DocumentSummary } from '@/api/plagiarismApi';
 import { designSystem } from '@/styles/DesignSystem';
 
 export default function CompareTab() {
   const navigate = useNavigate();
-  const { selectedTaskId } = useWorkspaceStore();
+  const { selectedTaskId } = useComparisonStore();
 
   const [pairs, setPairs] = useState<ComparePairSummary[]>([]);
   const [documentLookup, setDocumentLookup] = useState<Record<number, DocumentSummary>>({});
@@ -80,7 +80,7 @@ export default function CompareTab() {
 
   // ==================== 交互函数 ====================
   const handleViewPair = (pairId: number) => {
-    navigate(`/compare/${pairId}`);
+    navigate(`/comparison/results/${pairId}`);
   };
 
   const getDocumentName = (docId: number) => {

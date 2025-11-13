@@ -14,8 +14,10 @@ from backend.models.report_models import (
     GeneratedReport,
     MatchDetail,
     ProjectReportData,
+    ProjectStatistics,
     ReportGenerationRequest,
     ReportProgress,
+    ReportTemplate,
     ReportType,
 )
 from backend.services.base_service import BaseService, singleton
@@ -135,7 +137,7 @@ class ReportGeneratorService(BaseService):
                 id=task_id,
                 type=request.type,
                 title=self._generate_report_title(request, report_data),
-                summary=self._extract_summary(report_content),
+                summary=self._extract_summary(report_content),  # 前端已不再使用，保留仅为数据完整性
                 content=report_content,
                 data=report_data,
                 generated_at=datetime.utcnow(),
@@ -202,7 +204,7 @@ class ReportGeneratorService(BaseService):
                 id=task_id,
                 type=request.type,
                 title=self._generate_report_title(request, report_data),
-                summary=self._extract_summary(report_content),
+                summary=self._extract_summary(report_content),  # 前端已不再使用，保留仅为数据完整性
                 content=report_content,
                 data=report_data,
                 generated_at=datetime.utcnow(),
@@ -332,7 +334,7 @@ class ReportGeneratorService(BaseService):
 
         return "\n".join(lines)
 
-    def _format_match_details(self, matches) -> str:
+    def _format_match_details(self, matches: list[MatchDetail]) -> str:
         """格式化匹配详情"""
         if not matches:
             return "无高风险匹配内容。"
@@ -355,7 +357,7 @@ class ReportGeneratorService(BaseService):
 高风险来源: {stats.get('high_risk_sources', 0)}
 """
 
-    def _format_side_by_side_analysis(self, sections) -> str:
+    def _format_side_by_side_analysis(self, sections: list[dict[str, Any]]) -> str:
         """格式化并排分析"""
         if not sections:
             return "无并排对比数据。"
@@ -368,7 +370,7 @@ class ReportGeneratorService(BaseService):
 
         return "\n".join(lines)
 
-    def _format_project_statistics(self, stats) -> str:
+    def _format_project_statistics(self, stats: ProjectStatistics) -> str:
         """格式化项目统计"""
         return f"""
 文档总数: {stats.total_documents}
@@ -377,7 +379,7 @@ class ReportGeneratorService(BaseService):
 高风险文档: {stats.high_risk_count}
 """
 
-    def _format_high_risk_documents(self, high_risk_docs) -> str:
+    def _format_high_risk_documents(self, high_risk_docs: list[DocumentReportData]) -> str:
         """格式化高风险文档"""
         if not high_risk_docs:
             return "无高风险文档。"
@@ -388,7 +390,7 @@ class ReportGeneratorService(BaseService):
 
         return "\n".join(lines)
 
-    def _process_llm_response(self, response, template) -> dict[str, Any]:
+    def _process_llm_response(self, response: Any, template: ReportTemplate) -> dict[str, Any]:
         """处理LLM响应"""
         content = response.choices[0].message.content
 
@@ -432,7 +434,7 @@ class ReportGeneratorService(BaseService):
     def _build_structured_content(
         self,
         request: ReportGenerationRequest,
-        report_data,
+        report_data: DocumentReportData | ComparisonReportData | ProjectReportData,
         llm_payload: dict[str, Any]
     ) -> dict[str, Any]:
         full_content = llm_payload.get("full_content", "")
@@ -440,11 +442,11 @@ class ReportGeneratorService(BaseService):
         generated_at = llm_payload.get("generated_at") or datetime.utcnow().isoformat()
         model_used = llm_payload.get("model_used") or request.llm_model
 
-        if request.type == ReportType.DOCUMENT:
+        if request.type == ReportType.DOCUMENT and isinstance(report_data, DocumentReportData):
             structured = self._build_document_structure(report_data)
-        elif request.type == ReportType.COMPARISON:
+        elif request.type == ReportType.COMPARISON and isinstance(report_data, ComparisonReportData):
             structured = self._build_comparison_structure(report_data)
-        elif request.type == ReportType.PROJECT:
+        elif request.type == ReportType.PROJECT and isinstance(report_data, ProjectReportData):
             structured = self._build_project_structure(report_data)
         else:
             structured = {}
@@ -600,7 +602,7 @@ class ReportGeneratorService(BaseService):
             return "<p>未识别到符合阈值的相似片段。</p>"
 
         header = """
-<table class=\"similarity-table\" style=\"width:100%;border-collapse:collapse;margin-top:0.75rem;font-size:14px;\">
+<table class=\"similarity-table\" style=\"width:100%;border-collapse:collapse;margin-top:0.75rem;\">
   <thead>
     <tr style=\"background:#f4f4f5;\">
       <th style=\"border:1px solid #d4d4d8;padding:6px;width:60px;\">序号</th>
@@ -641,13 +643,13 @@ class ReportGeneratorService(BaseService):
         safe = html.escape(text)
         return safe.replace("\n", "<br/>")
 
-    def _generate_report_title(self, request: ReportGenerationRequest, data) -> str:
+    def _generate_report_title(self, request: ReportGenerationRequest, data: DocumentReportData | ComparisonReportData | ProjectReportData) -> str:
         """生成报告标题"""
-        if request.type == ReportType.DOCUMENT:
+        if request.type == ReportType.DOCUMENT and isinstance(data, DocumentReportData):
             return f"文档抄袭检测报告 - {data.document_title}"
-        elif request.type == ReportType.COMPARISON:
+        elif request.type == ReportType.COMPARISON and isinstance(data, ComparisonReportData):
             return f"文档对比分析报告 - {data.document_a_title} vs {data.document_b_title}"
-        elif request.type == ReportType.PROJECT:
+        elif request.type == ReportType.PROJECT and isinstance(data, ProjectReportData):
             return f"项目学术诚信分析报告 - {data.project_name}"
         else:
             return "抄袭检测报告"
@@ -667,7 +669,7 @@ class ReportGeneratorService(BaseService):
         progress: float,
         stage: str,
         message: str
-    ):
+    ) -> None:
         """更新进度"""
         if task_id in self.active_generations:
             self.active_generations[task_id].progress = progress

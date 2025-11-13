@@ -5,11 +5,12 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Card, Table, Tag, Button, message } from 'antd';
-import { PlayCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
 import { plagiarismApi, type ProjectSummary, type CompareJobSummary } from '@/api/plagiarismApi';
 import { useCompareJobs, useDocuments } from '@/hooks/useData';
-import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useComparisonStore } from '@/store/comparisonStore';
 import { JOB_STATUS_META, fallbackStatusMeta } from '@/lib/status';
 import { useProgressTracking } from '@/hooks/useProgressTracking';
 import { ProgressIndicator } from '@/components/progress/ProgressIndicator';
@@ -21,9 +22,10 @@ interface TasksTabProps {
 
 export default function TasksTab({ project }: TasksTabProps) {
   // ==================== 状态管理 ====================
+  const navigate = useNavigate();
   const [comparisonTaskId, setComparisonTaskId] = useState<string | null>(null);
   const [runningComparisons, setRunningComparisons] = useState(false);
-  const { selectedTaskId, openTask, setActiveTab } = useWorkspaceStore();
+  const { selectedTaskId, selectTask } = useComparisonStore();
 
   const jobsState = useCompareJobs(project.id);
   const documentState = useDocuments({ projectId: project.id });
@@ -80,6 +82,22 @@ export default function TasksTab({ project }: TasksTabProps) {
     neutral: 'default',
   } as const;
 
+  // ==================== 操作函数 ====================
+  const handleViewResults = async (job: CompareJobSummary) => {
+    try {
+      const pairs = await plagiarismApi.listPairs(job.id);
+      if (pairs.length > 0) {
+        // 跳转到第一个pair的全屏对比页
+        navigate(`/comparison/results/${pairs[0].id}`);
+      } else {
+        message.info('该任务暂无对比结果');
+      }
+    } catch (error) {
+      console.error('Failed to load pairs:', error);
+      message.error('加载对比结果失败');
+    }
+  };
+
   // ==================== 表格列定义 ====================
   const columns: ColumnsType<CompareJobSummary> = [
     {
@@ -113,22 +131,32 @@ export default function TasksTab({ project }: TasksTabProps) {
         </span>
       ),
     },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 120,
+      render: (_, record) => (
+        <Button
+          type="primary"
+          size="small"
+          icon={<EyeOutlined />}
+          disabled={record.status !== 'completed'}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleViewResults(record);
+          }}
+        >
+          查看结果
+        </Button>
+      ),
+    },
   ];
 
   const completedDocs = documents.filter((doc) => doc.status === 'completed').length;
 
-  // ==================== 交互函数 ====================
+  // 点击行选中任务
   const handleTaskClick = (job: CompareJobSummary) => {
-    // 选中任务
-    openTask(job.id);
-  };
-
-  const handleTaskDoubleClick = (job: CompareJobSummary) => {
-    // 双击已完成任务，切换到 compare tab 查看结果
-    if (job.status === 'completed') {
-      openTask(job.id);
-      setActiveTab('compare');
-    }
+    selectTask(job.id);
   };
 
   // ==================== 渲染 ====================
@@ -137,7 +165,7 @@ export default function TasksTab({ project }: TasksTabProps) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: designSystem.spacing[2],
+        gap: designSystem.spacing[1],
         height: '100%',
       }}
     >
@@ -210,7 +238,6 @@ export default function TasksTab({ project }: TasksTabProps) {
           }}
           onRow={(record) => ({
             onClick: () => handleTaskClick(record),
-            onDoubleClick: () => handleTaskDoubleClick(record),
             style: {
               cursor: 'pointer',
               backgroundColor: selectedTaskId === record.id ? designSystem.colors.primary[50] : undefined

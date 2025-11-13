@@ -4,6 +4,7 @@ from fastapi import Depends
 
 from backend.repositories.redis import RedisCache
 from backend.services import ServiceFactory
+from backend.services.detection_orchestrator import DetectionOrchestrator
 from backend.services.embedding_service import EmbeddingService
 from backend.services.health_service import HealthService
 from backend.services.llm_service import LLMService
@@ -36,7 +37,7 @@ def get_health_service(
     return HealthService(storage, cache)
 
 
-def get_detection_service():
+def get_detection_service() -> DetectionOrchestrator:
     """获取检测编排服务单例"""
     return ServiceFactory.get_detection_orchestrator()
 
