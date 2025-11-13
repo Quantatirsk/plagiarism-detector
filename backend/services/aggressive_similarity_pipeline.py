@@ -1,17 +1,17 @@
 """Aggressive similarity pipeline with simplified 3-stage processing."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
 from backend.db.models import DocumentChunk
-from backend.services.embedding_service import EmbeddingService
 from backend.services.cross_encoder_service import CrossEncoderService
-from backend.services.types import CandidatePayload, SpanPayload
+from backend.services.embedding_service import EmbeddingService
 from backend.services.minhash_filter import MinHashFilterStage as MinHashService
 from backend.services.pipeline_metrics import metrics_collector
+from backend.services.types import CandidatePayload, SpanPayload
 
 
 @dataclass
@@ -31,25 +31,25 @@ class AggressivePipelineConfig:
 class CandidateState:
     """Simplified candidate state tracking."""
     payload: CandidatePayload
-    semantic_score: Optional[float] = None
-    minhash_score: Optional[float] = None  # Optional MinHash score
-    cross_score: Optional[float] = None
-    final_score: Optional[float] = None
-    spans: List[SpanPayload] = field(default_factory=list)
+    semantic_score: float | None = None
+    minhash_score: float | None = None  # Optional MinHash score
+    cross_score: float | None = None
+    final_score: float | None = None
+    spans: list[SpanPayload] = field(default_factory=list)
 
 
 @dataclass
 class AggressivePipelineContext:
     """Simplified pipeline context."""
     plan_id: int
-    left_chunks: Dict[int, DocumentChunk]
-    right_chunks: Dict[int, DocumentChunk]
+    left_chunks: dict[int, DocumentChunk]
+    right_chunks: dict[int, DocumentChunk]
     config: AggressivePipelineConfig
     embedding_service: EmbeddingService
-    left_embeddings: Dict[int, Sequence[float]]
-    right_embeddings: Dict[int, Sequence[float]]
-    cross_encoder_service: Optional[CrossEncoderService]
-    candidate_states: Dict[Tuple[int, int], CandidateState] = field(default_factory=dict)
+    left_embeddings: dict[int, Sequence[float]]
+    right_embeddings: dict[int, Sequence[float]]
+    cross_encoder_service: CrossEncoderService | None
+    candidate_states: dict[tuple[int, int], CandidateState] = field(default_factory=dict)
 
 
 class PipelineStage:
@@ -111,11 +111,11 @@ class SemanticRecallStage(PipelineStage):
 
     async def _ensure_embeddings(
         self,
-        ids: List[int],
-        chunks: Dict[int, DocumentChunk],
-        cache: Dict[int, Sequence[float]],
+        ids: list[int],
+        chunks: dict[int, DocumentChunk],
+        cache: dict[int, Sequence[float]],
         embedding_service: EmbeddingService,
-    ) -> List[Sequence[float]]:
+    ) -> list[Sequence[float]]:
         missing_ids = [cid for cid in ids if cid not in cache]
         if missing_ids:
             texts = [chunks[cid].text for cid in missing_ids]
@@ -125,9 +125,10 @@ class SemanticRecallStage(PipelineStage):
         return [cache[cid] for cid in ids]
 
     def _normalize(self, matrix: np.ndarray) -> np.ndarray:
+        from typing import cast
         norms = np.linalg.norm(matrix, axis=1, keepdims=True)
         norms[norms == 0] = 1.0
-        return matrix / norms
+        return cast(np.ndarray, matrix / norms)
 
 
 class MinHashFilterStage(PipelineStage):
@@ -250,9 +251,9 @@ class AlignmentStage(PipelineStage):
 class AggressiveSimilarityPipeline:
     """Simplified 3-stage pipeline: Semantic → (MinHash) → Cross-encoder."""
 
-    def __init__(self, config: Optional[AggressivePipelineConfig] = None):
+    def __init__(self, config: AggressivePipelineConfig | None = None):
         self.config = config or AggressivePipelineConfig()
-        self.stages: List[PipelineStage] = [
+        self.stages: list[PipelineStage] = [
             SemanticRecallStage(),
             MinHashFilterStage(),
             CrossEncoderDirectStage(),
@@ -265,18 +266,18 @@ class AggressiveSimilarityPipeline:
         left_chunks: Sequence[DocumentChunk],
         right_chunks: Sequence[DocumentChunk],
         embedding_service: EmbeddingService,
-        left_embeddings: Optional[Dict[int, Sequence[float]]] = None,
-        right_embeddings: Optional[Dict[int, Sequence[float]]] = None,
-        cross_encoder_service: Optional[CrossEncoderService] = None,
-    ) -> Dict[Tuple[int, int], CandidateState]:
+        left_embeddings: dict[int, Sequence[float]] | None = None,
+        right_embeddings: dict[int, Sequence[float]] | None = None,
+        cross_encoder_service: CrossEncoderService | None = None,
+    ) -> dict[tuple[int, int], CandidateState]:
         # Start metrics collection
         pipeline_id = f"aggressive-{plan_id}"
         metrics_collector.start_pipeline(pipeline_id)
 
         context = AggressivePipelineContext(
             plan_id=plan_id,
-            left_chunks={chunk.id: chunk for chunk in left_chunks},
-            right_chunks={chunk.id: chunk for chunk in right_chunks},
+            left_chunks={chunk.id: chunk for chunk in left_chunks if chunk.id is not None},
+            right_chunks={chunk.id: chunk for chunk in right_chunks if chunk.id is not None},
             config=self.config,
             embedding_service=embedding_service,
             left_embeddings=left_embeddings or {},
@@ -286,7 +287,8 @@ class AggressiveSimilarityPipeline:
 
         # Track initial candidates (all possible pairs)
         initial_candidates = len(left_chunks) * len(right_chunks)
-        metrics_collector.current_metrics.total_candidates_initial = initial_candidates
+        if metrics_collector.current_metrics:
+            metrics_collector.current_metrics.total_candidates_initial = initial_candidates
 
         for stage in self.stages:
             stage_name = stage.__class__.__name__

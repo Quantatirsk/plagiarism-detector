@@ -1,243 +1,112 @@
-import { useEffect, useMemo, useState } from 'react';
-import type {
-  CompareJobSummary,
-  ComparePairSummary,
-  ProjectSummary,
-  DocumentSummary,
-} from '@/api/plagiarismApi';
-import { ProjectsPage } from '@/pages/ProjectsPage';
-import { ProjectDetailPanel } from '@/pages/ProjectDetailPanel';
-import { ProjectJobPanel } from '@/pages/ProjectJobPanel';
-import { PlanComparePage } from '@/pages/PlanComparePage';
-import { ReportsPage } from '@/pages/ReportsPage';
-import { useDocuments, useJobPairs } from '@/hooks/useData';
-import { useCachedPairData } from '@/hooks/useCachedPairData';
-import { Button } from '@/components/ui/button';
+import { ConfigProvider, theme } from 'antd';
+import zhCN from 'antd/locale/zh_CN';
+import { RouterProvider } from 'react-router-dom';
+import { router } from './router';
+import { designSystem } from './styles';
+import { GlobalStyles } from './styles/GlobalStyles';
 
 function App() {
-  const [view, setView] = useState<'projects' | 'project' | 'job' | 'pair' | 'reports'>('projects');
-  const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null);
-  const [selectedJob, setSelectedJob] = useState<CompareJobSummary | null>(null);
-  const [selectedPair, setSelectedPair] = useState<ComparePairSummary | null>(null);
-  const [reportMode, setReportMode] = useState<'project' | 'job' | 'document'>('project');
+  return (
+    <>
+      <GlobalStyles />
+      <ConfigProvider
+      locale={zhCN}
+      theme={{
+        algorithm: theme.defaultAlgorithm,  // 默认主题
+        token: {
+          // 品牌色配置
+          colorPrimary: designSystem.colors.primary[500],
+          colorLink: designSystem.colors.primary[500],
+          colorLinkHover: designSystem.colors.primary[600],
 
-  const projectDocumentsState = useDocuments(selectedProject ? { projectId: selectedProject.id } : undefined);
-  const projectDocuments = projectDocumentsState.data ?? [];
-  const documentLookup = useMemo(() => {
-    return projectDocuments.reduce<Record<number, DocumentSummary>>((acc, document) => {
-      acc[document.id] = document;
-      return acc;
-    }, {});
-  }, [projectDocuments]);
+          // 全局圆角（从 design-system 统一配置）
+          borderRadius: parseInt(designSystem.borderRadius.md),      // 4px - 按钮、输入框、菜单
+          borderRadiusLG: parseInt(designSystem.borderRadius.lg),    // 6px - 卡片
+          borderRadiusSM: parseInt(designSystem.borderRadius.sm),    // 2px - 小元素
 
-  const jobPairsState = useJobPairs(selectedJob?.id ?? null);
-  const jobPairs = jobPairsState.data ?? [];
+          // 字号（从 design-system 统一配置）
+          fontSize: parseInt(designSystem.componentFontSize.global),  // 13px - 全局基础字号
+          fontSizeHeading1: parseInt(designSystem.typography.fontSize['2xl']),  // 28px
+          fontSizeHeading2: parseInt(designSystem.typography.fontSize.xl),      // 22px
+          fontSizeHeading3: parseInt(designSystem.typography.fontSize.lg),      // 20px
 
-  const hasActivePairs = useMemo(
-    () => jobPairs.some((pair) => pair.status === 'pending' || pair.status === 'running'),
-    [jobPairs],
+          // 全局间距配置（Margin）- 从 design-system 统一配置
+          marginXXS: parseInt(designSystem.spacing[0.25]),  // 2px - 微小外边距
+          marginXS: parseInt(designSystem.spacing[0.5]),    // 4px - 极小外边距
+          marginSM: parseInt(designSystem.spacing[1]),      // 8px - 小外边距
+          margin: parseInt(designSystem.spacing[2]),        // 12px - 基础外边距
+          marginLG: parseInt(designSystem.spacing[3]),      // 16px - 大外边距
+          marginXL: parseInt(designSystem.spacing[5]),      // 24px - 超大外边距
+
+          // 全局间距配置（Padding）- 从 design-system 统一配置
+          paddingXXS: parseInt(designSystem.spacing[0.5]),  // 4px - 超超小内边距
+          paddingXS: parseInt(designSystem.spacing[1]),     // 8px - 超小内边距
+          paddingSM: parseInt(designSystem.spacing[2]),     // 12px - 小内边距
+          padding: parseInt(designSystem.spacing[3]),       // 16px - 基础内边距
+          paddingLG: parseInt(designSystem.spacing[5]),     // 24px - 大内边距
+          paddingXL: parseInt(designSystem.spacing[6]),     // 32px - 超大内边距
+        },
+        // 组件级样式覆盖 - 从 design-system 统一配置
+        components: {
+          // Card 卡片组件
+          Card: {
+            borderRadiusLG: parseInt(designSystem.cardSystem.borderRadius),  // 6px
+            paddingLG: parseInt(designSystem.spacing[2]),  // 12px - 卡片紧凑 padding
+            boxShadow: designSystem.cardSystem.shadow,
+            actionsLiMargin: `${designSystem.spacing[0.5]} 0`,  // 2px 上下
+            actionsBg: designSystem.semantic.surface.base,
+          },
+          // Table 表格组件
+          Table: {
+            borderRadiusLG: parseInt(designSystem.tableSystem.containerBorderRadius),  // 6px
+            cellPaddingBlock: parseInt(designSystem.spacing[1]),  // 8px 垂直边距
+            cellPaddingInline: parseInt(designSystem.spacing[2]),  // 12px 水平边距
+            headerBg: designSystem.tableSystem.headerBackground,
+            headerColor: designSystem.semantic.text.primary,
+            borderColor: designSystem.tableSystem.borderColor,
+            rowHoverBg: designSystem.tableSystem.rowHoverBackground,
+            fontSize: parseInt(designSystem.componentFontSize.tableCell),  // 13px
+          },
+          // Modal 弹窗组件
+          Modal: {
+            contentBg: designSystem.semantic.surface.elevated,
+            headerBg: designSystem.semantic.surface.elevated,
+            paddingLG: parseInt(designSystem.spacing[3]),  // 16px - 容器层边距
+            paddingMD: parseInt(designSystem.spacing[3]),  // 16px
+            paddingContentHorizontalLG: parseInt(designSystem.spacing[3]),
+            borderRadiusLG: parseInt(designSystem.borderRadius.lg),  // 6px
+          },
+          // Drawer 侧边栏组件
+          Drawer: {
+            paddingLG: parseInt(designSystem.spacing[3]),  // 16px - 容器层边距
+            colorBgElevated: designSystem.semantic.surface.elevated,
+          },
+          // Pagination 分页组件
+          Pagination: {
+            fontSize: parseInt(designSystem.componentFontSize.pagination),  // 13px
+            itemSize: 28,  // 分页项尺寸
+          },
+          // Menu 菜单组件
+          Menu: {
+            itemPaddingInline: parseInt(designSystem.spacing[3]),  // 16px - 左右内边距
+            fontSize: parseInt(designSystem.componentFontSize.menu),  // 13px
+            itemHeight: 40,
+            collapsedWidth: parseInt(designSystem.sidebarSystem.collapsedWidth),  // 56px - 与 Sider 一致
+          },
+          // Tooltip 提示组件
+          Tooltip: {
+            paddingXS: parseInt(designSystem.tooltipSystem.paddingBlock),  // 6px
+            fontSize: parseInt(designSystem.componentFontSize.tooltip),  // 12px
+            borderRadius: parseInt(designSystem.tooltipSystem.borderRadius),  // 4px
+            colorBgSpotlight: designSystem.tooltipSystem.background,
+          },
+        },
+      }}
+      >
+        <RouterProvider router={router} />
+      </ConfigProvider>
+    </>
   );
-
-  // Get adjacent pair IDs for pre-fetching
-  const adjacentPairIds = useMemo(() => {
-    if (!selectedPair || !jobPairs.length) return [];
-    const currentIndex = jobPairs.findIndex(p => p.id === selectedPair.id);
-    const adjacent: number[] = [];
-    if (currentIndex > 0) adjacent.push(jobPairs[currentIndex - 1].id);
-    if (currentIndex < jobPairs.length - 1) adjacent.push(jobPairs[currentIndex + 1].id);
-    return adjacent;
-  }, [selectedPair, jobPairs]);
-
-  const cachedPairData = useCachedPairData(selectedPair?.id ?? null, adjacentPairIds);
-
-  useEffect(() => {
-    if (!selectedPair || !jobPairsState.data) {
-      return;
-    }
-    const next = jobPairsState.data.find((pair) => pair.id === selectedPair.id);
-    if (!next) {
-      setSelectedPair(null);
-      if (view === 'pair') {
-        setView('job');
-      }
-      return;
-    }
-    if (next !== selectedPair) {
-      setSelectedPair(next);
-    }
-  }, [jobPairsState.data, selectedPair, setView, view]);
-
-  useEffect(() => {
-    if (!selectedJob || (view !== 'job' && view !== 'pair')) {
-      return;
-    }
-    if (!hasActivePairs) {
-      return;
-    }
-    const timer = window.setInterval(() => {
-      jobPairsState.reload();
-    }, 5000);
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [hasActivePairs, jobPairsState.reload, selectedJob?.id, view]);
-
-  if (view === 'projects') {
-    return (
-      <ProjectsPage
-        onSelectProject={(project) => {
-          setSelectedProject(project);
-          setSelectedJob(null);
-          setSelectedPair(null);
-          setView('project');
-        }}
-      />
-    );
-  }
-
-  if (view === 'project' && selectedProject) {
-    return (
-      <ProjectDetailPanel
-        project={selectedProject}
-        onBack={() => {
-          setView('projects');
-          setSelectedProject(null);
-          setSelectedJob(null);
-          setSelectedPair(null);
-        }}
-        onOpenJob={(job) => {
-          setSelectedJob(job);
-          setSelectedPair(null);
-          setView('job');
-        }}
-      />
-    );
-  }
-
-  if (view === 'job' && selectedProject && selectedJob) {
-    return (
-      <ProjectJobPanel
-        project={selectedProject}
-        job={selectedJob}
-        onBack={() => {
-          setSelectedPair(null);
-          setView('project');
-        }}
-        onOpenPair={(pair) => {
-          setSelectedPair(pair);
-          setView('pair');
-        }}
-        pairs={jobPairs}
-        pairsLoading={jobPairsState.loading}
-        pairsError={jobPairsState.error}
-        onReloadPairs={jobPairsState.reload}
-        documentLookup={documentLookup}
-        onOpenReports={() => {
-          setReportMode('job');
-          setView('reports');
-        }}
-      />
-    );
-  }
-
-  if (view === 'pair' && selectedPair && selectedProject && selectedJob) {
-    if (cachedPairData.loading) {
-      return (
-        <PlanComparePage
-          report={cachedPairData.report}
-          leftDocument={cachedPairData.leftDocument}
-          rightDocument={cachedPairData.rightDocument}
-          pairs={jobPairs}
-          pairsLoading={jobPairsState.loading}
-          pairsError={jobPairsState.error}
-        documentLookup={documentLookup}
-        onSwitchPair={(pairId) => {
-          const next = jobPairs.find((pair) => pair.id === pairId);
-          if (next) {
-            setSelectedPair(next);
-          }
-        }}
-        onBack={() => setView('job')}
-        isTransitioning={true}
-      />
-      );
-    }
-
-    if (cachedPairData.error || !cachedPairData.report) {
-      return (
-        <div className="flex h-full flex-col items-center justify-center gap-3 bg-muted/40 text-sm text-destructive">
-          加载配对报告失败：{cachedPairData.error ?? '未知错误'}
-          <Button variant="outline" size="sm" onClick={() => setView('job')}>
-            返回任务
-          </Button>
-        </div>
-      );
-    }
-
-    return (
-      <PlanComparePage
-        report={cachedPairData.report}
-        leftDocument={cachedPairData.leftDocument}
-        rightDocument={cachedPairData.rightDocument}
-        pairs={jobPairs}
-        pairsLoading={jobPairsState.loading}
-        pairsError={jobPairsState.error}
-        documentLookup={documentLookup}
-        onSwitchPair={(pairId) => {
-          const next = jobPairs.find((pair) => pair.id === pairId);
-          if (next) {
-            setSelectedPair(next);
-          }
-        }}
-        onBack={() => setView('job')}
-        isTransitioning={false}
-      />
-    );
-  }
-
-  // Reports view
-  if (view === 'reports') {
-    // Prepare available documents and projects data
-    const sortedDocuments = [...projectDocuments].sort((a, b) => {
-      const aTime = new Date(a.created_at).getTime();
-      const bTime = new Date(b.created_at).getTime();
-      return aTime - bTime;
-    });
-
-    const availableDocuments = sortedDocuments.map(doc => ({
-      id: doc.id.toString(),
-      title: doc.title || doc.filename || `文档 ${doc.id}`
-    }));
-
-    const availableProjects = selectedProject ? [{
-      id: selectedProject.id.toString(),
-      name: selectedProject.name || `项目 ${selectedProject.id}`
-    }] : [];
-
-    // Determine navigation context based on report mode
-    const handleBack = () => {
-      if (reportMode === 'project' && selectedProject) {
-        setView('project');
-      } else if (reportMode === 'job' && selectedJob) {
-        setView('job');
-      } else {
-        setView('projects');
-      }
-    };
-
-    return (
-      <ReportsPage
-        mode={reportMode}
-        project={selectedProject || undefined}
-        job={selectedJob || undefined}
-        availableDocuments={availableDocuments}
-        availableProjects={availableProjects}
-        onBack={handleBack}
-      />
-    );
-  }
-
-  return null;
 }
 
 export default App;

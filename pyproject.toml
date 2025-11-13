@@ -1,0 +1,120 @@
+[tool.mypy]
+# 基础设置
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+# 严格模式（渐进式采用 - 初期较宽松）
+check_untyped_defs = true
+disallow_untyped_defs = false  # 暂时允许无类型定义
+disallow_any_generics = false
+disallow_untyped_calls = false
+no_implicit_optional = true
+strict_equality = true
+
+# 错误输出
+show_error_codes = true
+pretty = true
+
+# 排除第三方文档处理工具
+exclude = ["backend/document-skills/"]
+
+# 第三方库无类型定义时不报错
+[[tool.mypy.overrides]]
+module = [
+    "fastapi.*",
+    "pydantic.*",
+    "sqlmodel.*",
+    "structlog.*",
+    "redis.*",
+    "minio.*",
+    "pymilvus.*",
+    "milvus_lite.*",
+    "prometheus_client.*",
+    "prometheus_fastapi_instrumentator.*",
+    "lxml.*",
+    "pymupdf.*",
+    "fitz.*",
+    "docx.*",
+    "spacy.*",
+    "langdetect.*",
+    "streamlit.*",
+    "azure.*",
+]
+ignore_missing_imports = true
+
+# 测试目录放松规则
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+check_untyped_defs = false
+
+[tool.pyright]
+include = ["backend", "tests"]
+exclude = [
+    "**/__pycache__",
+    "**/.venv",
+    "**/node_modules",
+    "backend/document-skills",  # 第三方文档处理技能
+]
+
+# 类型检查级别 (off | basic | strict)
+typeCheckingMode = "basic"  # 保持 basic，日常开发友好
+
+# Python 版本
+pythonVersion = "3.11"
+pythonPlatform = "Darwin"
+
+# 报告控制 - 只启用关键错误，避免提示过多
+reportMissingTypeStubs = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportPrivateUsage = "warning"
+reportConstantRedefinition = "error"
+reportIncompatibleMethodOverride = "error"  # 关键：方法重写不兼容
+reportGeneralTypeIssues = "error"  # 关键：一般类型问题（包括变量类型冲突）
+reportOptionalMemberAccess = "warning"  # 可选成员访问警告
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+# 排除目录
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "migrations",
+    "backend/document-skills",  # 第三方文档处理技能
+    "frontend",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "RUF",    # Ruff-specific rules
+]
+
+ignore = [
+    "E501",   # line too long (formatter 处理)
+    "B008",   # function calls in defaults (FastAPI Depends)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]        # 允许 __init__ 中未使用的导入
+"tests/**/*.py" = ["S101"]      # 允许测试中使用 assert
+
+[tool.ruff.lint.isort]
+known-first-party = ["backend", "tests"]

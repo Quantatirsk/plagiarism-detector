@@ -9,10 +9,11 @@
 - 其他文本格式 (.rst, .py, .js 等)
 """
 
-from typing import Optional, Dict, Any
 from pathlib import Path
-from backend.tools.readers import get_readers_service
+from typing import Any
+
 from backend.services.base_service import BaseService, singleton
+from backend.tools.readers import get_readers_service
 
 
 @singleton
@@ -23,7 +24,7 @@ class DocumentParser(BaseService):
         """初始化文档解析器"""
         self.readers_service = get_readers_service()
 
-    def parse_document(self, file_path: str) -> Optional[str]:
+    def parse_document(self, file_path: str) -> str | None:
         """
         解析文档并返回纯文本内容
 
@@ -57,7 +58,7 @@ class DocumentParser(BaseService):
             self.logger.error(f"解析文档时出错 {file_path}: {e}")
             return None
 
-    def get_document_info(self, file_path: str) -> Dict[str, Any]:
+    def get_document_info(self, file_path: str) -> dict[str, Any]:
         """
         获取文档信息
 

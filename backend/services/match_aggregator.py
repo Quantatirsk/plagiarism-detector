@@ -1,8 +1,9 @@
 """Aggregation helpers for grouping sentence-level matches."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, cast
+from typing import cast
 
 from backend.db.models import DocumentChunk
 from backend.services.types import SpanPayload
@@ -10,9 +11,9 @@ from backend.services.types import SpanPayload
 
 @dataclass
 class MatchState:
-    final_score: Optional[float]
-    semantic_score: Optional[float]
-    cross_score: Optional[float]
+    final_score: float | None
+    semantic_score: float | None
+    cross_score: float | None
     spans: Sequence[SpanPayload]
 
 
@@ -22,10 +23,10 @@ class MatchAggregator:
     def __init__(
         self,
         *,
-        left_map: Dict[int, DocumentChunk],
-        right_map: Dict[int, DocumentChunk],
-        left_lookup: Dict[int, int],
-        right_lookup: Dict[int, int],
+        left_map: dict[int, DocumentChunk],
+        right_map: dict[int, DocumentChunk],
+        left_lookup: dict[int, int],
+        right_lookup: dict[int, int],
         best_match_only: bool = False,  # 新增参数：是否只保留最佳匹配
     ) -> None:
         self.left_map = left_map
@@ -33,9 +34,9 @@ class MatchAggregator:
         self.left_lookup = left_lookup
         self.right_lookup = right_lookup
         self.best_match_only = best_match_only
-        self._records: Dict[tuple[int, int], Dict[str, object]] = {}
+        self._records: dict[tuple[int, int], dict[str, object]] = {}
         # 追踪每个左侧段落的最佳匹配（仅在best_match_only=True时使用）
-        self._best_matches: Dict[int, tuple[int, float]] = {}
+        self._best_matches: dict[int, tuple[int, float]] = {}
 
     def add(self, left_id: int, right_id: int, state: MatchState) -> None:
         left_parent = self.left_lookup.get(left_id, left_id)
@@ -77,10 +78,10 @@ class MatchAggregator:
             }
             self._records[key] = record
 
-        record["final_score"] = self._max_optional(cast(Optional[float], record["final_score"]), state.final_score)
-        record["semantic_score"] = self._max_optional(cast(Optional[float], record["semantic_score"]), state.semantic_score)
-        record["cross_score"] = self._max_optional(cast(Optional[float], record["cross_score"]), state.cross_score)
-        record["match_count"] = cast(int, record["match_count"]) + 1
+        record["final_score"] = self._max_optional(cast("float | None", record["final_score"]), state.final_score)
+        record["semantic_score"] = self._max_optional(cast("float | None", record["semantic_score"]), state.semantic_score)
+        record["cross_score"] = self._max_optional(cast("float | None", record["cross_score"]), state.cross_score)
+        record["match_count"] = cast("int", record["match_count"]) + 1
 
         span_set: set = record["span_set"]  # type: ignore[assignment]
         doc_span_set: set = record["doc_span_set"]  # type: ignore[assignment]
@@ -128,12 +129,13 @@ class MatchAggregator:
             }
         )
 
-    def finalize(self) -> List[Dict[str, object]]:
-        results: List[Dict[str, object]] = []
+    def finalize(self) -> list[dict[str, object]]:
+        results: list[dict[str, object]] = []
         for (left_parent, right_parent), record in self._records.items():
-            span_set: set = record.pop("span_set")  # type: ignore[assignment]
-            doc_span_set: set = record.pop("doc_span_set")  # type: ignore[assignment]
-            details = record.pop("details")  # type: ignore[assignment]
+            from typing import cast
+            span_set: set = cast(set, record.pop("span_set"))
+            doc_span_set: set = cast(set, record.pop("doc_span_set"))
+            details = cast(list, record.pop("details"))
             spans = [
                 SpanPayload(
                     left_start=left_start,
@@ -185,7 +187,8 @@ class MatchAggregator:
                     "alignment_ratio",
                 ),
             )
-            for detail in result["details"]:
+            from typing import cast
+            for detail in cast(list, result["details"]):
                 if isinstance(detail, dict):
                     self._round_numeric_fields(
                         detail,
@@ -201,7 +204,7 @@ class MatchAggregator:
         return results
 
     @staticmethod
-    def _max_optional(current: Optional[float], value: Optional[float]) -> Optional[float]:
+    def _max_optional(current: float | None, value: float | None) -> float | None:
         if value is None:
             return current
         if current is None or value > current:
@@ -213,7 +216,7 @@ class MatchAggregator:
         spans: Sequence[SpanPayload],
         left_chunk: DocumentChunk,
         right_chunk: DocumentChunk,
-    ) -> Optional[float]:
+    ) -> float | None:
         if not spans:
             return None
         left_overlap = self._interval_coverage(spans, side="left")
@@ -224,7 +227,7 @@ class MatchAggregator:
 
     @staticmethod
     def _interval_coverage(spans: Sequence[SpanPayload], *, side: str) -> int:
-        intervals: List[tuple[int, int]] = []
+        intervals: list[tuple[int, int]] = []
         for span in spans:
             if side == "left":
                 intervals.append((span.left_start, span.left_end))
@@ -233,7 +236,7 @@ class MatchAggregator:
         if not intervals:
             return 0
         intervals.sort()
-        merged = []
+        merged: list[list[int]] = []
         for start, end in intervals:
             if not merged or start > merged[-1][1]:
                 merged.append([start, end])
@@ -242,18 +245,18 @@ class MatchAggregator:
         return sum(end - start for start, end in merged)
 
     @staticmethod
-    def _round_numeric_fields(entry: Dict[str, object], fields: Sequence[str], *, ndigits: int = 4) -> None:
+    def _round_numeric_fields(entry: dict[str, object], fields: Sequence[str], *, ndigits: int = 4) -> None:
         for field in fields:
             value = entry.get(field)
             if isinstance(value, float):
                 entry[field] = round(value, ndigits)
 
-    def _sort_key(self, item: Dict[str, object]) -> tuple[int, int, float]:
-        left_chunk = self.left_map[cast(int, item["left_chunk_id"])]
-        right_chunk = self.right_map[cast(int, item["right_chunk_id"])]
+    def _sort_key(self, item: dict[str, object]) -> tuple[int, int, float]:
+        left_chunk = self.left_map[cast("int", item["left_chunk_id"])]
+        right_chunk = self.right_map[cast("int", item["right_chunk_id"])]
         left_anchor = left_chunk.start_pos
         right_anchor = right_chunk.start_pos
-        score = float(cast(Optional[float], item.get("final_score")) or 0.0)
+        score = float(cast("float | None", item.get("final_score")) or 0.0)
         return (left_anchor, right_anchor, -score)
 
 

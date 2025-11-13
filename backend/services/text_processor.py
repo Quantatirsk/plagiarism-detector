@@ -2,13 +2,15 @@
 文本处理服务 - 文本分割、清理等基础功能
 使用 spaCy 进行中英文句子分割，支持混合语言文档
 """
-import re
-from typing import Any, List, Tuple, Dict, Optional
 import hashlib
+import re
 from functools import lru_cache
+from typing import Any
+
 import spacy
+from langdetect import LangDetectException, detect
 from spacy.language import Language
-from langdetect import detect, LangDetectException
+
 from backend.services.base_service import BaseService, singleton
 
 
@@ -129,7 +131,7 @@ class TextProcessor(BaseService):
         if "merge_short_sentences_zh" not in self.nlp_zh.pipe_names:
             self.nlp_zh.add_pipe("merge_short_sentences_zh", after="zh_number_protector")
 
-    def _compute_text_hash(self, text: str, params: Optional[Dict] = None) -> str:
+    def _compute_text_hash(self, text: str, params: dict | None = None) -> str:
         """计算文本哈希值，用于缓存键"""
         # 包含文本内容和处理参数的哈希
         cache_key = text
@@ -137,7 +139,7 @@ class TextProcessor(BaseService):
             cache_key += str(sorted(params.items()))
         return hashlib.md5(cache_key.encode('utf-8')).hexdigest()
 
-    def _get_from_cache(self, cache_key: str) -> Optional[Any]:
+    def _get_from_cache(self, cache_key: str) -> Any | None:
         """从缓存获取结果"""
         if cache_key in self._cache:
             # Linus: "Data structures" - 移到末尾实现 LRU
@@ -192,11 +194,11 @@ class TextProcessor(BaseService):
 
         except LangDetectException:
             # 检测失败默认使用中文模型
-            self.logger.warning(f"语言检测失败，默认使用中文模型")
+            self.logger.warning("语言检测失败，默认使用中文模型")
             return 'zh'
 
 
-    def _split_long_paragraph_internal(self, paragraph: str, max_chars: int = 600) -> List[str]:
+    def _split_long_paragraph_internal(self, paragraph: str, max_chars: int = 600) -> list[str]:
         """分割超长段落，确保不超过最大字符数限制"""
         # 使用 langdetect 检测语言类型
         lang = self.detect_language(paragraph)
@@ -272,7 +274,7 @@ class TextProcessor(BaseService):
         text: str,
         min_length: int = 20,
         max_chars: int = 600,
-    ) -> List[Tuple[str, int, int]]:
+    ) -> list[tuple[str, int, int]]:
         """
         分割段落 - 使用单换行符作为段落分隔符，并对超长段落进行分割
         返回: [(text, start, end), ...]
@@ -290,9 +292,10 @@ class TextProcessor(BaseService):
         cached_result = self._get_from_cache(cache_key)
         if cached_result is not None:
             self.logger.debug(f"段落分割结果从缓存返回: {cache_key[:8]}...")
-            return cached_result
+            from typing import cast
+            return cast(list[tuple[str, int, int]], cached_result)
 
-        segments: List[Tuple[str, int, int]] = []
+        segments: list[tuple[str, int, int]] = []
         # 使用单换行符分割段落
         lines = text.split('\n')
         current_pos = 0
@@ -327,7 +330,7 @@ class TextProcessor(BaseService):
         self.logger.debug(f"段落分割结果已缓存: {cache_key[:8]}...")
         return segments
 
-    def _trim_whitespace_bounds(self, text: str, start: int, end: int) -> Tuple[int, int]:
+    def _trim_whitespace_bounds(self, text: str, start: int, end: int) -> tuple[int, int]:
         while start < end and text[start].isspace():
             start += 1
         while end > start and text[end - 1].isspace():
@@ -340,7 +343,7 @@ class TextProcessor(BaseService):
         absolute_start: int,
         lang: str,
         max_chars: int,
-    ) -> List[Tuple[int, int]]:
+    ) -> list[tuple[int, int]]:
         length = len(paragraph_text)
         if length <= max_chars:
             return [(absolute_start, absolute_start + length)]
@@ -349,7 +352,7 @@ class TextProcessor(BaseService):
         # 这个方法已经支持基于标点符号的智能分割
         sub_paragraphs = self._split_long_paragraph_internal(paragraph_text, max_chars)
 
-        segments: List[Tuple[int, int]] = []
+        segments: list[tuple[int, int]] = []
         cursor = 0
 
         for sub_para in sub_paragraphs:
@@ -365,7 +368,7 @@ class TextProcessor(BaseService):
         return segments
 
 
-    def split_sentences(self, text: str, min_length: int = 20) -> List[Tuple[str, int, int]]:
+    def split_sentences(self, text: str, min_length: int = 20) -> list[tuple[str, int, int]]:
         """
         使用双语言模型分割句子
         返回: [(text, start, end), ...]
@@ -382,11 +385,12 @@ class TextProcessor(BaseService):
         cached_result = self._get_from_cache(cache_key)
         if cached_result is not None:
             self.logger.debug(f"句子分割结果从缓存返回: {cache_key[:8]}...")
-            return cached_result
+            from typing import cast
+            return cast(list[tuple[str, int, int]], cached_result)
 
         # 按单个换行符分割成行
         lines = text.split('\n')
-        all_spans: List[Tuple[str, int, int]] = []
+        all_spans: list[tuple[str, int, int]] = []
         text_cursor = 0  # 在原始文本中的位置
 
         for line in lines:
@@ -466,10 +470,10 @@ class TextProcessor(BaseService):
         self.logger.debug(f"句子分割结果已缓存: {cache_key[:8]}...")
         return all_spans
 
-    def _split_sentences_regex(self, text: str, min_length: int = 20) -> List[Tuple[str, int, int]]:
+    def _split_sentences_regex(self, text: str, min_length: int = 20) -> list[tuple[str, int, int]]:
         """正则表达式分割句子并返回偏移 - 作为回退方案"""
         # Linus: "KISS" - 直接实现，避免二次查找
-        spans: List[Tuple[str, int, int]] = []
+        spans: list[tuple[str, int, int]] = []
 
         # 分割位置：句号、问号、感叹号、分号后
         split_pattern = r'([.!?。！？；])'
@@ -517,10 +521,10 @@ class TextProcessor(BaseService):
 
     def process_documents_batch(
         self,
-        texts: List[str],
+        texts: list[str],
         min_length: int = 20,
         max_chars: int = 600,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """批量处理文档，返回段落和句子分割结果"""
         self._ensure_initialized()
         results = []
@@ -538,10 +542,11 @@ class TextProcessor(BaseService):
                 "sentence_count": len(sentences),
             })
 
+        from typing import cast
         self.logger.info(
             f"批量处理了 {len(texts)} 个文档，"
-            f"共 {sum(r['paragraph_count'] for r in results)} 个段落，"
-            f"{sum(r['sentence_count'] for r in results)} 个句子"
+            f"共 {sum(cast(int, r['paragraph_count']) for r in results)} 个段落，"
+            f"{sum(cast(int, r['sentence_count']) for r in results)} 个句子"
         )
         return results
 

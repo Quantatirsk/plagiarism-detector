@@ -6,15 +6,15 @@ from typing import TYPE_CHECKING
 
 # 避免循环导入，使用TYPE_CHECKING
 if TYPE_CHECKING:
-    from backend.services.embedding_service import EmbeddingService
-    from backend.services.vector_storage import MilvusStorage
-    from backend.services.text_processor import TextProcessor
-    from backend.services.document_parser import DocumentParser
-    from backend.services.health_service import HealthService
-    from backend.services.detection_orchestrator import DetectionOrchestrator
     from backend.services.comparison_service import ComparisonService
+    from backend.services.detection_orchestrator import DetectionOrchestrator
+    from backend.services.document_parser import DocumentParser
+    from backend.services.embedding_service import EmbeddingService
+    from backend.services.health_service import HealthService
     from backend.services.llm_service import LLMService
     from backend.services.report_generator_service import ReportGeneratorService
+    from backend.services.text_processor import TextProcessor
+    from backend.services.vector_storage import MilvusStorage
 
 
 class ServiceFactory:

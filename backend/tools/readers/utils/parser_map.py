@@ -4,6 +4,7 @@
 单一职责：定义文件扩展名到解析器的映射关系
 符合 Linux 哲学：配置与代码分离
 """
+from typing import Union
 
 # 专用解析器映射（优先级高）
 SPECIALIZED_PARSERS = {
@@ -11,6 +12,35 @@ SPECIALIZED_PARSERS = {
     '.pdf': ('backend.tools.readers.readers_pdf', 'PDFParser'),
     '.docx': ('backend.tools.readers.readers_docx', 'DOCXParser'),
     '.doc': ('backend.tools.readers.readers_doc', 'DOCParser'),
+    
+    # Excel 格式 - 统一解析器支持多种格式
+    '.xlsx': ('backend.tools.readers.readers_excel', 'ExcelParser'),
+    '.xls': ('backend.tools.readers.readers_excel', 'ExcelParser'),
+    '.xlsb': ('backend.tools.readers.readers_excel', 'ExcelParser'),
+    '.ods': ('backend.tools.readers.readers_excel', 'ExcelParser'),
+    
+    # 结构化数据 - 需要特殊处理
+    '.json': ('backend.tools.readers.readers_json', 'JSONParser'),
+    '.csv': ('backend.tools.readers.readers_csv', 'CSVParser'),
+    
+    # 图像格式 - 二进制文件
+    '.png': ('backend.tools.readers.readers_image', 'ImageParser'),
+    '.jpg': ('backend.tools.readers.readers_image', 'ImageParser'),
+    '.jpeg': ('backend.tools.readers.readers_image', 'ImageParser'),
+    '.bmp': ('backend.tools.readers.readers_image', 'ImageParser'),
+    '.tiff': ('backend.tools.readers.readers_image', 'ImageParser'),
+    '.gif': ('backend.tools.readers.readers_image', 'ImageParser'),
+    '.webp': ('backend.tools.readers.readers_image', 'ImageParser'),
+    
+    # 媒体格式（可选）
+    '.mp3': ('backend.tools.media.media_audio_parser', 'AudioParser'),
+    '.wav': ('backend.tools.media.media_audio_parser', 'AudioParser'),
+    '.m4a': ('backend.tools.media.media_audio_parser', 'AudioParser'),
+    '.flac': ('backend.tools.media.media_audio_parser', 'AudioParser'),
+    '.mp4': ('backend.tools.media.media_video_parser', 'VideoParser'),
+    '.avi': ('backend.tools.media.media_video_parser', 'VideoParser'),
+    '.mov': ('backend.tools.media.media_video_parser', 'VideoParser'),
+    '.mkv': ('backend.tools.media.media_video_parser', 'VideoParser'),
 }
 
 # 文本解析器支持的格式
@@ -267,21 +297,21 @@ def get_format_stats():
     """获取格式支持的统计信息"""
     parser_map = get_parser_map()
     
-    stats = {
+    stats: dict[str, Union[int, dict[str, int]]] = {
         'total': len(parser_map),
         'text_formats': len(TEXT_PARSER_FORMATS),
         'specialized_formats': len(SPECIALIZED_PARSERS),
         'extensionless_files': len(EXTENSIONLESS_TEXT_FILES),
     }
-    
+
     # 按解析器分组
-    by_parser = {}
+    by_parser: dict[str, list[str]] = {}
     for ext, (module, parser) in parser_map.items():
         key = f"{module}.{parser}"
         if key not in by_parser:
             by_parser[key] = []
         by_parser[key].append(ext)
-    
+
     stats['by_parser'] = {k: len(v) for k, v in by_parser.items()}
     
     return stats

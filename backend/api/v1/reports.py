@@ -1,19 +1,17 @@
 """
 报告生成API端点 - 支持文档、对比和项目级报告生成
 """
-from typing import Dict, Any, Optional
+import json
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-import json
 
-from backend.models.report_models import (
-    ReportType, ReportGenerationRequest, GeneratedReport, ReportProgress
-)
+from backend.core.errors import LLMError, create_http_exception
+from backend.models.report_models import ReportGenerationRequest, ReportType
 from backend.services.report_generator_service import ReportGeneratorService
 from backend.services.service_factory import ServiceFactory
-from backend.core.errors import create_http_exception, LLMError
-import structlog
 
 router = APIRouter(prefix="/api/v1/reports", tags=["Reports"])
 logger = structlog.get_logger()
@@ -26,7 +24,7 @@ class DocumentReportRequest(BaseModel):
     include_charts: bool = Field(default=True, description="是否包含图表")
     include_recommendations: bool = Field(default=True, description="是否包含建议")
     max_matches_detail: int = Field(default=20, description="最大匹配详情数量")
-    llm_model: Optional[str] = Field(None, description="LLM模型")
+    llm_model: str | None = Field(None, description="LLM模型")
     stream_response: bool = Field(default=False, description="是否流式响应")
 
 
@@ -37,7 +35,7 @@ class ComparisonReportRequest(BaseModel):
     language: str = Field(default="zh", description="报告语言")
     include_charts: bool = Field(default=True, description="是否包含图表")
     include_recommendations: bool = Field(default=True, description="是否包含建议")
-    llm_model: Optional[str] = Field(None, description="LLM模型")
+    llm_model: str | None = Field(None, description="LLM模型")
     stream_response: bool = Field(default=False, description="是否流式响应")
 
 
@@ -48,7 +46,7 @@ class ProjectReportRequest(BaseModel):
     include_charts: bool = Field(default=True, description="是否包含图表")
     include_recommendations: bool = Field(default=True, description="是否包含建议")
     include_network_graph: bool = Field(default=True, description="是否包含网络图")
-    llm_model: Optional[str] = Field(None, description="LLM模型")
+    llm_model: str | None = Field(None, description="LLM模型")
     stream_response: bool = Field(default=False, description="是否流式响应")
 
 
@@ -88,8 +86,9 @@ async def generate_document_report(
             # 流式响应
             async def generate():
                 try:
+                    from typing import cast, AsyncGenerator as AG
                     generator = await report_generator.generate_report(generation_request, stream=True)
-                    async for chunk in generator:
+                    async for chunk in cast(AG[str, None], generator):
                         yield f"data: {chunk}\n"
                 except Exception as e:
                     error_data = {"type": "error", "message": str(e)}
@@ -118,7 +117,7 @@ async def generate_document_report(
         raise create_http_exception(e)
     except Exception as e:
         logger.error("Unexpected error in document report generation", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {e!s}")
 
 
 @router.post("/comparison", summary="生成文档对比分析报告")
@@ -150,8 +149,9 @@ async def generate_comparison_report(
         if request.stream_response:
             async def generate():
                 try:
+                    from typing import cast, AsyncGenerator as AG
                     generator = await report_generator.generate_report(generation_request, stream=True)
-                    async for chunk in generator:
+                    async for chunk in cast(AG[str, None], generator):
                         yield f"data: {chunk}\n"
                 except Exception as e:
                     error_data = {"type": "error", "message": str(e)}
@@ -179,7 +179,7 @@ async def generate_comparison_report(
         raise create_http_exception(e)
     except Exception as e:
         logger.error("Unexpected error in comparison report generation", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {e!s}")
 
 
 @router.post("/project", summary="生成项目学术诚信分析报告")
@@ -212,8 +212,9 @@ async def generate_project_report(
         if request.stream_response:
             async def generate():
                 try:
+                    from typing import cast, AsyncGenerator as AG
                     generator = await report_generator.generate_report(generation_request, stream=True)
-                    async for chunk in generator:
+                    async for chunk in cast(AG[str, None], generator):
                         yield f"data: {chunk}\n"
                 except Exception as e:
                     error_data = {"type": "error", "message": str(e)}
@@ -241,7 +242,7 @@ async def generate_project_report(
         raise create_http_exception(e)
     except Exception as e:
         logger.error("Unexpected error in project report generation", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {e!s}")
 
 
 @router.get("/progress/{task_id}", summary="获取报告生成进度")
@@ -330,7 +331,7 @@ async def report_service_health():
         report_generator = ServiceFactory.get_report_generator()
 
         # 检查服务是否初始化
-        if not hasattr(report_generator, '_initialized') or not report_generator._initialized:
+        if not report_generator.is_initialized():
             return {
                 "status": "initializing",
                 "message": "Report generator is initializing"
@@ -352,5 +353,5 @@ async def report_service_health():
         logger.error("Report service health check failed", error=str(e))
         return {
             "status": "unhealthy",
-            "message": f"Service health check failed: {str(e)}"
+            "message": f"Service health check failed: {e!s}"
         }

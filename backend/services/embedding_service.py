@@ -3,7 +3,8 @@
 """
 import asyncio
 import hashlib
-from typing import List, Optional, Callable, Dict, Any
+from collections.abc import Callable
+from typing import Any
 
 import openai
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -26,19 +27,19 @@ class EmbeddingService(BaseService):
         self.model = self.settings.embedding_model
         self.dimensions = self.settings.embedding_dimensions
         self.batch_size = self.settings.embedding_batch_size
-        self.cache: Optional[RedisCache] = RedisCache() if self.settings.redis_url else None
+        self.cache: RedisCache | None = RedisCache() if self.settings.redis_url else None
         self._cache_prefix = f"embedding:{self.model}:"
         self._cache_ready = False
-        self._cache_lock: Optional[asyncio.Lock] = None
-    
+        self._cache_lock: asyncio.Lock | None = None
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10)
     )
-    async def embed_text(self, text: str) -> List[float]:
+    async def embed_text(self, text: str) -> list[float]:
         """单文本嵌入"""
         self._ensure_initialized()
-        cache_key: Optional[str] = None
+        cache_key: str | None = None
         cache_available = await self._ensure_cache_ready()
         if cache_available and self.cache is not None:
             cache_key = self._cache_key(text)
@@ -63,22 +64,22 @@ class EmbeddingService(BaseService):
         except Exception as e:
             self.logger.error("Embedding failed", text_length=len(text), error=str(e))
             raise EmbeddingError(f"Failed to embed text: {e}")
-    
+
     async def embed_batch(
         self,
-        texts: List[str],
-        progress_callback: Optional[Callable[[Dict[str, Any]], Any]] = None,
-        batch_size: Optional[int] = None
-    ) -> List[List[float]]:
+        texts: list[str],
+        progress_callback: Callable[[dict[str, Any]], Any] | None = None,
+        batch_size: int | None = None
+    ) -> list[list[float]]:
         """批量嵌入 - 支持进度回调的批次处理"""
         import asyncio
         self._ensure_initialized()
-        local_cache: dict[str, List[float]] = {}
+        local_cache: dict[str, list[float]] = {}
 
         # 使用配置的批次大小或默认值
         batch_size = batch_size or self.batch_size or 10
 
-        async def embed_single_safe(text: str) -> List[float]:
+        async def embed_single_safe(text: str) -> list[float]:
             """安全的单文本嵌入，失败时返回零向量"""
             cache_key = self._cache_key(text)
             if cache_key in local_cache:

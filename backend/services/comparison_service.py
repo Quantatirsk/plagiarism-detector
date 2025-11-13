@@ -1,27 +1,27 @@
 """Comparison execution pipeline orchestrating pairwise detection."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import cast
 
+from backend.core.logging import LogEvent, get_logger
 from backend.db.models import ChunkGranularity, ComparePairStatus, DocumentChunk
-from backend.services.base_service import BaseService, singleton
-from backend.services.detection_orchestrator import DetectionOrchestrator
-from backend.services.match_aggregator import MatchAggregator, MatchState
+from backend.models.detection_modes import DetectionMode, get_detection_config
+
 # Legacy pipeline imports removed
 from backend.services.aggressive_similarity_pipeline import (
     AggressiveSimilarityPipeline,
-    AggressivePipelineConfig,
-    CandidateState as AggressiveCandidateState,
 )
+from backend.services.base_service import BaseService, singleton
 from backend.services.cross_encoder_service import CrossEncoderService
+from backend.services.detection_orchestrator import DetectionOrchestrator
 from backend.services.embedding_service import EmbeddingService
-from backend.services.types import CandidatePayload, SpanPayload
-from backend.services.text_processor import TextProcessor
-from backend.services.storage_gateway import MatchGroupCreate, MatchDetailCreate
+from backend.services.match_aggregator import MatchAggregator, MatchState
 from backend.services.progress_tracker import ProgressTracker
-from backend.models.detection_modes import DetectionMode, get_detection_config
-from backend.core.logging import get_logger, LogEvent
+from backend.services.storage_gateway import MatchDetailCreate, MatchGroupCreate
+from backend.services.text_processor import TextProcessor
+from backend.services.types import CandidatePayload, SpanPayload
 
 logger = get_logger(__name__)
 
@@ -32,9 +32,9 @@ class ComparisonConfig:
     mode: DetectionMode = DetectionMode.AGGRESSIVE
     granularity: ChunkGranularity = ChunkGranularity.PARAGRAPH
     # Optional overrides
-    semantic_threshold: Optional[float] = None
-    final_threshold: Optional[float] = None
-    top_k: Optional[int] = None
+    semantic_threshold: float | None = None
+    final_threshold: float | None = None
+    top_k: int | None = None
     # Match filtering strategy
     match_strategy: str = "bidirectional_stable"  # "all", "best_per_source", "bidirectional_stable", "bidirectional_relaxed"
     relaxed_threshold_ratio: float = 0.95  # For bidirectional_relaxed mode
@@ -52,7 +52,7 @@ class ComparisonService(BaseService):
         self.text_processor = TextProcessor()
         self.progress_tracker = ProgressTracker()
 
-    async def run_pair(self, pair_id: int, config: ComparisonConfig, progress_task_id: Optional[str] = None) -> None:
+    async def run_pair(self, pair_id: int, config: ComparisonConfig, progress_task_id: str | None = None) -> None:
         self._ensure_initialized()
 
         logger.info(
@@ -94,8 +94,8 @@ class ComparisonService(BaseService):
             left_paragraphs = [chunk for chunk in left_chunks if chunk.chunk_type == ChunkGranularity.PARAGRAPH]
             right_paragraphs = [chunk for chunk in right_chunks if chunk.chunk_type == ChunkGranularity.PARAGRAPH]
 
-            left_map = {chunk.id: chunk for chunk in left_chunks}
-            right_map = {chunk.id: chunk for chunk in right_chunks}
+            left_map = {chunk.id: chunk for chunk in left_chunks if chunk.id is not None}
+            right_map = {chunk.id: chunk for chunk in right_chunks if chunk.id is not None}
 
             target_left, target_right = self._select_granularity(
                 config.granularity,
@@ -126,7 +126,7 @@ class ComparisonService(BaseService):
             )
 
             candidate_states = await pipeline.run(
-                plan_id=pair.id,
+                plan_id=pair.id or 0,
                 left_chunks=target_left,
                 right_chunks=target_right,
                 embedding_service=self.embedding_service,
@@ -149,7 +149,7 @@ class ComparisonService(BaseService):
             use_best_match = config.match_strategy == "best_per_source"
             aggregator = self._build_aggregator(left_map, right_map, best_match_only=use_best_match)
             # Get threshold from mode config
-            threshold = mode_config.aggressive_config.final_threshold
+            threshold = mode_config.aggressive_config.final_threshold if mode_config.aggressive_config else 0.5
 
             for state in candidate_states.values():
                 final_score = self._determine_final_score(state)
@@ -188,17 +188,17 @@ class ComparisonService(BaseService):
                 )
 
             group_payloads = [
-                self._to_group_payload(pair.id, entry)
+                self._to_group_payload(pair.id or 0, entry)
                 for entry in results
             ]
 
             detail_payloads = [
-                self._to_detail_payload(pair.id, entry, detail)
+                self._to_detail_payload(pair.id or 0, entry, detail)
                 for entry in results
-                for detail in entry["details"]
+                for detail in cast(list, entry["details"])
             ]
 
-            await self.orchestrator.persist_match_results(pair.id, group_payloads, detail_payloads)
+            await self.orchestrator.persist_match_results(pair.id or 0, group_payloads, detail_payloads)
 
             if progress_task_id:
                 await self.progress_tracker.update_progress(
@@ -235,7 +235,7 @@ class ComparisonService(BaseService):
             )
             raise
 
-    def _determine_final_score(self, state) -> Optional[float]:
+    def _determine_final_score(self, state) -> float | None:
         """Prefer fused scores but fall back to strongest available signal."""
         for score in (
             state.final_score,
@@ -251,8 +251,8 @@ class ComparisonService(BaseService):
 
     def _build_aggregator(
         self,
-        left_map: Dict[int, DocumentChunk],
-        right_map: Dict[int, DocumentChunk],
+        left_map: dict[int, DocumentChunk],
+        right_map: dict[int, DocumentChunk],
         best_match_only: bool = False,
     ) -> MatchAggregator:
         left_lookup = self._build_parent_lookup(left_map)
@@ -265,9 +265,9 @@ class ComparisonService(BaseService):
             best_match_only=best_match_only,
         )
 
-    def _build_parent_lookup(self, chunks: Dict[int, DocumentChunk]) -> Dict[int, int]:
+    def _build_parent_lookup(self, chunks: dict[int, DocumentChunk]) -> dict[int, int]:
         """改进的父级查找逻辑"""
-        lookup: Dict[int, int] = {}
+        lookup: dict[int, int] = {}
 
         # 建立段落位置索引
         paragraphs = [chunk for chunk in chunks.values() if chunk.chunk_type == ChunkGranularity.PARAGRAPH]
@@ -276,13 +276,18 @@ class ComparisonService(BaseService):
         paragraph_spans = [
             (p.id, p.start_pos, p.end_pos)
             for p in sorted(paragraphs, key=lambda x: x.start_pos)
+            if p.id is not None
         ]
 
         # 段落映射到自己
         for para_id, _, _ in paragraph_spans:
-            lookup[para_id] = para_id
+            if para_id is not None:
+                lookup[para_id] = para_id
 
         for sentence in sentences:
+            if sentence.id is None:
+                continue
+
             # 1. 优先使用预设的parent_chunk_id
             if sentence.parent_chunk_id:
                 # 验证parent_chunk_id是否有效
@@ -291,14 +296,14 @@ class ComparisonService(BaseService):
                     continue
 
             # 2. 使用二分查找快速定位包含句子的段落
-            para_id = self._binary_search_paragraph(
+            found_para_id = self._binary_search_paragraph(
                 sentence.start_pos,
                 sentence.end_pos,
                 paragraph_spans
             )
 
-            if para_id:
-                lookup[sentence.id] = para_id
+            if found_para_id is not None:
+                lookup[sentence.id] = found_para_id
             else:
                 # 3. 降级策略：找最近的段落
                 lookup[sentence.id] = self._find_nearest_paragraph(
@@ -312,8 +317,8 @@ class ComparisonService(BaseService):
         self,
         sent_start: int,
         sent_end: int,
-        paragraph_spans: List[Tuple[int, int, int]]
-    ) -> Optional[int]:
+        paragraph_spans: list[tuple[int, int, int]]
+    ) -> int | None:
         """使用二分查找快速定位包含句子的段落"""
         left, right = 0, len(paragraph_spans) - 1
 
@@ -333,15 +338,15 @@ class ComparisonService(BaseService):
     def _find_nearest_paragraph(
         self,
         sentence: DocumentChunk,
-        paragraph_spans: List[Tuple[int, int, int]]
+        paragraph_spans: list[tuple[int, int, int]]
     ) -> int:
         """找最近的段落作为降级策略"""
         if not paragraph_spans:
-            return sentence.id
+            return sentence.id or 0
 
         # 计算距离并找到最近的段落
         min_distance = float('inf')
-        nearest_id = sentence.id
+        nearest_id = sentence.id or 0
 
         for para_id, para_start, para_end in paragraph_spans:
             # 计算句子中心到段落中心的距离
@@ -358,9 +363,9 @@ class ComparisonService(BaseService):
     def _build_full_spans(
         self,
         payload: CandidatePayload,
-        left_map: Dict[int, DocumentChunk],
-        right_map: Dict[int, DocumentChunk],
-    ) -> List[SpanPayload]:
+        left_map: dict[int, DocumentChunk],
+        right_map: dict[int, DocumentChunk],
+    ) -> list[SpanPayload]:
         left_chunk = left_map[payload.left_chunk_id]
         right_chunk = right_map[payload.right_chunk_id]
         return [
@@ -372,36 +377,36 @@ class ComparisonService(BaseService):
             )
         ]
 
-    def _to_group_payload(self, pair_id: int, entry: Dict[str, object]):
+    def _to_group_payload(self, pair_id: int, entry: dict[str, object]):
         return MatchGroupCreate(
             pair_id=pair_id,
-            left_chunk_id=entry["left_chunk_id"],
-            right_chunk_id=entry["right_chunk_id"],
-            final_score=entry.get("final_score"),
-            semantic_score=entry.get("semantic_score"),
-            cross_score=entry.get("cross_score"),
-            alignment_ratio=entry.get("alignment_ratio"),
-            span_count=entry.get("span_count", 0),
-            match_count=entry.get("match_count", 0),
-            paragraph_spans=entry.get("paragraph_spans"),
-            document_spans=entry.get("document_spans"),
+            left_chunk_id=cast(int, entry["left_chunk_id"]),
+            right_chunk_id=cast(int, entry["right_chunk_id"]),
+            final_score=cast(float | None, entry.get("final_score")),
+            semantic_score=cast(float | None, entry.get("semantic_score")),
+            cross_score=cast(float | None, entry.get("cross_score")),
+            alignment_ratio=cast(float | None, entry.get("alignment_ratio")),
+            span_count=cast(int, entry.get("span_count", 0)),
+            match_count=cast(int, entry.get("match_count", 0)),
+            paragraph_spans=cast(list[dict] | None, entry.get("paragraph_spans")),
+            document_spans=cast(list[dict] | None, entry.get("document_spans")),
         )
 
-    def _to_detail_payload(self, pair_id: int, entry: Dict[str, object], detail: Dict[str, object]):
+    def _to_detail_payload(self, pair_id: int, entry: dict[str, object], detail: dict[str, object]):
         return MatchDetailCreate(
-            left_chunk_id=detail["left_chunk_id"],
-            right_chunk_id=detail["right_chunk_id"],
-            final_score=detail.get("final_score"),
-            semantic_score=detail.get("semantic_score"),
-            cross_score=detail.get("cross_score"),
-            spans=detail.get("spans"),
-            group_key=detail.get("group_pair") or (entry["left_chunk_id"], entry["right_chunk_id"]),
+            left_chunk_id=cast(int, detail["left_chunk_id"]),
+            right_chunk_id=cast(int, detail["right_chunk_id"]),
+            final_score=cast(float | None, detail.get("final_score")),
+            semantic_score=cast(float | None, detail.get("semantic_score")),
+            cross_score=cast(float | None, detail.get("cross_score")),
+            spans=cast(list[dict] | None, detail.get("spans")),
+            group_key=cast(tuple[int, int] | None, detail.get("group_pair")) or (cast(int, entry["left_chunk_id"]), cast(int, entry["right_chunk_id"])),
         )
 
-    def _build_metrics(self, groups: Sequence[Dict[str, object]]) -> Dict[str, object]:
+    def _build_metrics(self, groups: Sequence[dict[str, object]]) -> dict[str, object]:
         total = len(groups)
-        top_score = max((group.get("final_score") or 0.0 for group in groups), default=0.0)
-        coverage = sum(group.get("alignment_ratio") or 0.0 for group in groups)
+        top_score = max((cast(float, group.get("final_score") or 0.0) for group in groups), default=0.0)
+        coverage = sum(cast(float, group.get("alignment_ratio") or 0.0) for group in groups)
         return {
             "group_count": total,
             "top_score": round(top_score, 4),
@@ -411,11 +416,11 @@ class ComparisonService(BaseService):
     def _select_granularity(
         self,
         granularity: ChunkGranularity,
-        left_sentences: List[DocumentChunk],
-        right_sentences: List[DocumentChunk],
-        left_paragraphs: List[DocumentChunk],
-        right_paragraphs: List[DocumentChunk],
-    ) -> tuple[List[DocumentChunk], List[DocumentChunk]]:
+        left_sentences: list[DocumentChunk],
+        right_sentences: list[DocumentChunk],
+        left_paragraphs: list[DocumentChunk],
+        right_paragraphs: list[DocumentChunk],
+    ) -> tuple[list[DocumentChunk], list[DocumentChunk]]:
         if granularity == ChunkGranularity.PARAGRAPH:
             if left_paragraphs and right_paragraphs:
                 return left_paragraphs, right_paragraphs

@@ -1,11 +1,13 @@
 """
 健康检查服务 - 应用健康状态和就绪状态检查
 """
-from typing import Dict, Any
 from datetime import datetime
+from typing import Any
+
+import openai
+
 from backend.core.config import MilvusMode
 from backend.services.base_service import BaseService
-import openai
 
 
 class HealthService(BaseService):
@@ -19,12 +21,12 @@ class HealthService(BaseService):
     def _initialize(self):
         """初始化健康检查服务"""
         self.start_time = datetime.now()
-    
-    async def check_health(self) -> Dict[str, Any]:
+
+    async def check_health(self) -> dict[str, Any]:
         """基础健康检查 - 应用是否运行"""
         self._ensure_initialized()
         uptime = (datetime.now() - self.start_time).total_seconds()
-        
+
         return {
             "status": "healthy",
             "timestamp": datetime.now().isoformat(),
@@ -32,8 +34,8 @@ class HealthService(BaseService):
             "version": self.settings.version,
             "mode": "development" if self.settings.milvus_mode == MilvusMode.LOCAL else "production"
         }
-    
-    async def check_readiness(self) -> Dict[str, Any]:
+
+    async def check_readiness(self) -> dict[str, Any]:
         """就绪检查 - 系统是否准备好接收请求"""
         checks = {
             "api": True,  # API总是就绪的
@@ -41,37 +43,37 @@ class HealthService(BaseService):
             "openai": False,
             "overall": False
         }
-        
+
         errors = []
-        
+
         # 检查Milvus连接
         try:
             checks["milvus"] = await self._check_milvus()
         except Exception as e:
             self.logger.error("Milvus check failed", error=str(e))
-            errors.append(f"Milvus: {str(e)}")
-        
+            errors.append(f"Milvus: {e!s}")
+
         # 检查OpenAI API
         try:
             checks["openai"] = await self._check_openai()
         except Exception as e:
             self.logger.error("OpenAI check failed", error=str(e))
-            errors.append(f"OpenAI: {str(e)}")
-        
+            errors.append(f"OpenAI: {e!s}")
+
         # 总体就绪状态
         checks["overall"] = checks["milvus"] and checks["openai"]
-        
+
         result = {
             "ready": checks["overall"],
             "checks": checks,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         if errors:
             result["errors"] = errors
-        
+
         return result
-    
+
     async def _check_milvus(self) -> bool:
         """检查Milvus连接状态"""
         try:
@@ -95,7 +97,7 @@ class HealthService(BaseService):
         except Exception as e:
             self.logger.error("Milvus health check failed", error=str(e))
             return False
-    
+
     async def _check_openai(self) -> bool:
         """检查OpenAI API连接"""
         try:
@@ -110,13 +112,13 @@ class HealthService(BaseService):
                 input="test",
                 model=self.settings.embedding_model
             )
-            
+
             return len(response.data) > 0
         except Exception as e:
             self.logger.error("OpenAI health check failed", error=str(e))
             return False
-    
-    async def get_system_info(self) -> Dict[str, Any]:
+
+    async def get_system_info(self) -> dict[str, Any]:
         """获取系统详细信息"""
         return {
             "configuration": {

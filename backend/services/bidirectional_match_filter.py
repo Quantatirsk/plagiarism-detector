@@ -1,6 +1,6 @@
 """Bidirectional best match filter for paragraph-level matches."""
-from typing import Dict, List, Set, Tuple
 from dataclasses import dataclass
+from typing import cast
 
 
 @dataclass
@@ -9,7 +9,7 @@ class MatchScore:
     left_id: int
     right_id: int
     score: float
-    details: Dict[str, object]
+    details: dict[str, object]
 
 
 class BidirectionalMatchFilter:
@@ -18,19 +18,19 @@ class BidirectionalMatchFilter:
     只保留互为最佳匹配的段落对，类似稳定婚姻算法的思想。
     """
 
-    def __init__(self, matches: List[Dict[str, object]]):
+    def __init__(self, matches: list[dict[str, object]]):
         self.matches = matches
-        self._left_to_right_best: Dict[int, Tuple[int, float]] = {}
-        self._right_to_left_best: Dict[int, Tuple[int, float]] = {}
+        self._left_to_right_best: dict[int, tuple[int, float]] = {}
+        self._right_to_left_best: dict[int, tuple[int, float]] = {}
         self._build_best_matches()
 
     def _build_best_matches(self) -> None:
         """构建双向最佳匹配映射。"""
         # 找出每个左侧段落的最佳右侧匹配
         for match in self.matches:
-            left_id = match["left_chunk_id"]
-            right_id = match["right_chunk_id"]
-            score = match.get("final_score", 0.0)
+            left_id = cast(int, match["left_chunk_id"])
+            right_id = cast(int, match["right_chunk_id"])
+            score = cast(float, match.get("final_score", 0.0))
 
             # 更新左侧的最佳匹配
             if left_id not in self._left_to_right_best or score > self._left_to_right_best[left_id][1]:
@@ -40,11 +40,11 @@ class BidirectionalMatchFilter:
             if right_id not in self._right_to_left_best or score > self._right_to_left_best[right_id][1]:
                 self._right_to_left_best[right_id] = (left_id, score)
 
-    def get_stable_matches(self) -> List[Dict[str, object]]:
+    def get_stable_matches(self) -> list[dict[str, object]]:
         """
         返回稳定匹配（互为最佳选择的匹配对）。
         """
-        stable_pairs: Set[Tuple[int, int]] = set()
+        stable_pairs: set[tuple[int, int]] = set()
 
         # 找出互为最佳匹配的对
         for left_id, (right_id, _) in self._left_to_right_best.items():
@@ -58,14 +58,14 @@ class BidirectionalMatchFilter:
             if (match["left_chunk_id"], match["right_chunk_id"]) in stable_pairs
         ]
 
-    def get_relaxed_matches(self, threshold_ratio: float = 0.95) -> List[Dict[str, object]]:
+    def get_relaxed_matches(self, threshold_ratio: float = 0.95) -> list[dict[str, object]]:
         """
         返回宽松的匹配（允许次优匹配，如果分数接近最佳匹配）。
 
         Args:
             threshold_ratio: 相对于最佳匹配的分数比例阈值（默认0.95）
         """
-        accepted_matches: Set[Tuple[int, int]] = set()
+        accepted_matches: set[tuple[int, int]] = set()
 
         # 首先添加所有稳定匹配
         for left_id, (right_id, _) in self._left_to_right_best.items():
@@ -75,9 +75,9 @@ class BidirectionalMatchFilter:
 
         # 添加接近最佳的次优匹配
         for match in self.matches:
-            left_id = match["left_chunk_id"]
-            right_id = match["right_chunk_id"]
-            score = match.get("final_score", 0.0)
+            left_id = cast(int, match["left_chunk_id"])
+            right_id = cast(int, match["right_chunk_id"])
+            score = cast(float, match.get("final_score", 0.0))
 
             # 检查是否接近左侧的最佳匹配
             if left_id in self._left_to_right_best:
@@ -94,7 +94,7 @@ class BidirectionalMatchFilter:
             if (match["left_chunk_id"], match["right_chunk_id"]) in accepted_matches
         ]
 
-    def get_statistics(self) -> Dict[str, int]:
+    def get_statistics(self) -> dict[str, int]:
         """返回匹配统计信息。"""
         stable_matches = self.get_stable_matches()
         return {

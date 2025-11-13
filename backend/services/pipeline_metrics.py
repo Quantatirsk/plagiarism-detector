@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Any
 
 from backend.core.logging import get_logger
 
@@ -43,8 +43,8 @@ class PipelineMetrics:
     """Aggregated metrics for entire pipeline execution."""
     pipeline_id: str
     start_time: float = field(default_factory=time.time)
-    end_time: Optional[float] = None
-    stages: Dict[str, StageMetrics] = field(default_factory=dict)
+    end_time: float | None = None
+    stages: dict[str, StageMetrics] = field(default_factory=dict)
     total_candidates_initial: int = 0
     total_candidates_final: int = 0
 
@@ -85,7 +85,7 @@ class PipelineMetrics:
             return 0.0
         return self.total_cache_hits / total
 
-    def to_dict(self) -> Dict[str, any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert metrics to dictionary for reporting."""
         return {
             "pipeline_id": self.pipeline_id,
@@ -113,8 +113,8 @@ class MetricsCollector:
     """Collects and aggregates pipeline metrics."""
 
     def __init__(self):
-        self.metrics_history: List[PipelineMetrics] = []
-        self.current_metrics: Optional[PipelineMetrics] = None
+        self.metrics_history: list[PipelineMetrics] = []
+        self.current_metrics: PipelineMetrics | None = None
 
     def start_pipeline(self, pipeline_id: str) -> None:
         """Start tracking a new pipeline execution."""
@@ -174,13 +174,13 @@ class MetricsCollector:
         self.current_metrics = None
         return metrics
 
-    def get_aggregated_stats(self) -> Dict[str, any]:
+    def get_aggregated_stats(self) -> dict[str, Any]:
         """Get aggregated statistics from historical metrics."""
         if not self.metrics_history:
             return {}
 
         # Aggregate by stage
-        stage_stats = defaultdict(lambda: {
+        stage_stats: defaultdict[str, dict[str, Any]] = defaultdict(lambda: {
             "count": 0,
             "total_time": 0.0,
             "total_reduction": 0.0,

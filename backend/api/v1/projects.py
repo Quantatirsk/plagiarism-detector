@@ -1,8 +1,6 @@
 """Project management APIs for grouping document comparisons."""
 from __future__ import annotations
 
-from typing import List, Optional
-
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -19,21 +17,21 @@ def _orchestrator() -> DetectionOrchestrator:
 
 
 class ProjectCreateRequest(BaseModel):
-    name: Optional[str] = Field(default=None, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=1024)
+    name: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=1024)
 
 
 class ProjectResponse(BaseModel):
     id: int
-    name: Optional[str]
-    description: Optional[str]
+    name: str | None
+    description: str | None
     created_at: str
     updated_at: str
 
     @classmethod
-    def from_model(cls, project: Project) -> "ProjectResponse":
+    def from_model(cls, project: Project) -> ProjectResponse:
         return cls(
-            id=project.id,
+            id=project.id or 0,
             name=project.name,
             description=project.description,
             created_at=project.created_at.isoformat(),
@@ -42,22 +40,22 @@ class ProjectResponse(BaseModel):
 
 
 class ProjectListResponse(BaseModel):
-    items: List[ProjectResponse]
+    items: list[ProjectResponse]
 
 
 class ProjectJobResponse(BaseModel):
     id: int
     project_id: int
-    name: Optional[str]
+    name: str | None
     status: CompareJobStatus
-    created_at: Optional[str]
-    updated_at: Optional[str]
-    config: Optional[dict]
+    created_at: str | None
+    updated_at: str | None
+    config: dict | None
 
     @classmethod
-    def from_model(cls, job: CompareJob) -> "ProjectJobResponse":
+    def from_model(cls, job: CompareJob) -> ProjectJobResponse:
         return cls(
-            id=job.id,
+            id=job.id or 0,
             project_id=job.project_id,
             name=job.name,
             status=job.status,
@@ -68,7 +66,7 @@ class ProjectJobResponse(BaseModel):
 
 
 class ProjectJobListResponse(BaseModel):
-    items: List[ProjectJobResponse]
+    items: list[ProjectJobResponse]
 
 
 @router.post("", response_model=ProjectResponse, summary="Create a project")
@@ -113,7 +111,7 @@ async def list_project_jobs(
 
 class ProjectComparisonTaskResponse(BaseModel):
     task_id: str
-    job_id: Optional[int] = None
+    job_id: int | None = None
     message: str
 
 
@@ -132,17 +130,18 @@ async def run_project_comparisons(
         raise HTTPException(status_code=404, detail="Project not found")
 
     # Check if there are enough documents
-    from backend.db.models import Document, DocumentStatus
-    from backend.db import get_session
     from sqlalchemy import select
+
+    from backend.db import get_session
+    from backend.db.models import Document, DocumentStatus
 
     async with get_session() as session:
         stmt = (
             select(Document)
-            .where(Document.project_id == project_id)
-            .where(Document.status == DocumentStatus.COMPLETED)
+            .where(Document.project_id == project_id)  # type: ignore[arg-type]
+            .where(Document.status == DocumentStatus.COMPLETED)  # type: ignore[arg-type]
         )
-        documents = (await session.exec(stmt)).all()
+        documents = (await session.exec(stmt)).all()  # type: ignore[call-overload]
 
     if len(documents) < 2:
         raise HTTPException(
@@ -181,7 +180,7 @@ async def run_project_comparisons(
             logger.error("Project comparison failed", project_id=project_id, error=str(exc))
             await progress_tracker.fail_task(
                 comparison_task_id,
-                error_message=f"Comparison failed: {str(exc)}"
+                error_message=f"Comparison failed: {exc!s}"
             )
 
     background_tasks.add_task(run_comparisons)

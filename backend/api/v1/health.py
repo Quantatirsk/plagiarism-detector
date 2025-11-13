@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
-from backend.services.health_service import HealthService
-from backend.api.deps import get_health_service
-from typing import Dict, Any
+from typing import Any
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException
+
+from backend.api.deps import get_health_service
+from backend.services.health_service import HealthService
 
 router = APIRouter()
 logger = structlog.get_logger()
@@ -10,7 +12,7 @@ logger = structlog.get_logger()
 @router.get("/")
 async def health_check(
     health_service: HealthService = Depends(get_health_service)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     健康检查
     
@@ -26,7 +28,7 @@ async def health_check(
 @router.get("/ready")
 async def readiness_check(
     health_service: HealthService = Depends(get_health_service)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     就绪检查
     
@@ -34,14 +36,14 @@ async def readiness_check(
     """
     try:
         readiness_status = await health_service.check_readiness()
-        
+
         # 如果任何服务未就绪，返回503
         if not readiness_status.get("ready", False):
             raise HTTPException(
-                status_code=503, 
+                status_code=503,
                 detail=f"Service not ready: {readiness_status.get('reason', 'Unknown')}"
             )
-        
+
         return readiness_status
     except HTTPException:
         raise
@@ -50,7 +52,7 @@ async def readiness_check(
         raise HTTPException(status_code=503, detail="Service not ready")
 
 @router.get("/live")
-async def liveness_check() -> Dict[str, str]:
+async def liveness_check() -> dict[str, str]:
     """
     存活检查
     

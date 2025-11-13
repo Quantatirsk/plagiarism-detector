@@ -1,12 +1,15 @@
 from functools import lru_cache
+
+from fastapi import Depends
+
+from backend.repositories.redis import RedisCache
 from backend.services import ServiceFactory
 from backend.services.embedding_service import EmbeddingService
-from backend.services.vector_storage import MilvusStorage
-from backend.services.text_processor import TextProcessor
 from backend.services.health_service import HealthService
 from backend.services.llm_service import LLMService
-from backend.repositories.redis import RedisCache
-from fastapi import Depends
+from backend.services.text_processor import TextProcessor
+from backend.services.vector_storage import MilvusStorage
+
 
 def get_embedding_service() -> EmbeddingService:
     """获取嵌入服务单例"""
@@ -20,7 +23,7 @@ def get_text_processor() -> TextProcessor:
     """获取文本处理器单例"""
     return ServiceFactory.get_text_processor()
 
-@lru_cache()
+@lru_cache
 def get_cache_service() -> RedisCache:
     """获取缓存服务单例"""
     return RedisCache()

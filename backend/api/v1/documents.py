@@ -5,9 +5,8 @@ import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel
 
 from backend.core.logging import get_logger
@@ -25,7 +24,7 @@ def _orchestrator() -> DetectionOrchestrator:
     return DetectionOrchestrator()
 
 
-def _sanitize_filename(filename: Optional[str]) -> str:
+def _sanitize_filename(filename: str | None) -> str:
     if not filename:
         raise HTTPException(status_code=400, detail="Filename is required")
     name = Path(filename).name
@@ -65,10 +64,10 @@ async def _save_upload(upload: UploadFile, prefix: str) -> str:
 class DocumentSummary(BaseModel):
     id: int
     project_id: int
-    title: Optional[str]
-    filename: Optional[str]
-    source: Optional[str]
-    language: Optional[str]
+    title: str | None
+    filename: str | None
+    source: str | None
+    language: str | None
     status: DocumentStatus
     paragraph_count: int
     sentence_count: int
@@ -77,9 +76,9 @@ class DocumentSummary(BaseModel):
     updated_at: datetime
 
     @classmethod
-    def from_model(cls, document: Document) -> "DocumentSummary":
+    def from_model(cls, document: Document) -> DocumentSummary:
         return cls(
-            id=document.id,
+            id=document.id or 0,
             project_id=document.project_id,
             title=document.title,
             filename=document.filename,
@@ -95,21 +94,21 @@ class DocumentSummary(BaseModel):
 
 
 class UploadResponse(BaseModel):
-    items: List[DocumentSummary]
+    items: list[DocumentSummary]
 
 
 class UploadTaskResponse(BaseModel):
     task_id: str
-    documents: List[DocumentSummary]
+    documents: list[DocumentSummary]
     message: str = "Documents uploaded and processing started"
 
 
 @router.post("", response_model=UploadTaskResponse, summary="Upload one or more documents")
 async def upload_documents(
     background_tasks: BackgroundTasks,
-    files: List[UploadFile] = File(..., description="Documents to ingest"),
+    files: list[UploadFile] = File(..., description="Documents to ingest"),
     project_id: int = Form(..., description="Project identifier"),
-    source: Optional[str] = Form(None),
+    source: str | None = Form(None),
     orchestrator: DetectionOrchestrator = Depends(_orchestrator),
 ) -> UploadTaskResponse:
     if not files:
@@ -131,8 +130,8 @@ async def upload_documents(
     )
 
     # Save uploaded files first and create placeholder documents
-    temp_paths: List[str] = []
-    placeholder_docs: List[DocumentSummary] = []
+    temp_paths: list[str] = []
+    placeholder_docs: list[DocumentSummary] = []
 
     try:
         for index, upload in enumerate(files):
@@ -140,9 +139,10 @@ async def upload_documents(
             temp_paths.append(temp_path)
 
             # Create placeholder document
-            from backend.db.models import Document
-            from backend.db import get_session
             import hashlib
+
+            from backend.db import get_session
+            from backend.db.models import Document
 
             # Generate a temporary checksum for the placeholder
             temp_checksum = hashlib.sha256(f"{upload.filename}_{index}_{project_id}".encode()).hexdigest()
@@ -210,7 +210,7 @@ async def upload_documents(
 
         background_tasks.add_task(process_documents)
 
-    except Exception as e:
+    except Exception:
         # Cleanup on immediate failure
         for path in temp_paths:
             try:
@@ -228,13 +228,13 @@ async def upload_documents(
 
 
 class DocumentListResponse(BaseModel):
-    items: List[DocumentSummary]
+    items: list[DocumentSummary]
 
 
 @router.get("", response_model=DocumentListResponse, summary="List documents")
 async def list_documents(
-    status: Optional[DocumentStatus] = Query(None, description="Filter by status"),
-    project_id: Optional[int] = Query(None, description="Filter by project"),
+    status: DocumentStatus | None = Query(None, description="Filter by status"),
+    project_id: int | None = Query(None, description="Filter by project"),
     orchestrator: DetectionOrchestrator = Depends(_orchestrator),
 ) -> DocumentListResponse:
     documents = await orchestrator.list_documents(status=status, project_id=project_id)
@@ -244,8 +244,8 @@ async def list_documents(
 
 class DocumentDetailResponse(BaseModel):
     document: DocumentSummary
-    processed_text: Optional[str]
-    metadata: Optional[dict]
+    processed_text: str | None
+    metadata: dict | None
 
 
 @router.get("/{document_id}", response_model=DocumentDetailResponse, summary="Get document detail")

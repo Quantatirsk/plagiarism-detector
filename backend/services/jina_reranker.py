@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -17,7 +16,7 @@ class RerankResult:
     """Result from reranking operation matching Jina's format."""
     score: float
     index: int
-    document: Optional[dict] = None
+    document: dict | None = None
 
 
 class JinaRerankFunction:
@@ -47,7 +46,7 @@ class JinaRerankFunction:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
     )
-    def _make_request(self, query: str, documents: List[str], top_k: int) -> List[RerankResult]:
+    def _make_request(self, query: str, documents: list[str], top_k: int) -> list[RerankResult]:
         """Make rerank request to Jina API (synchronous)."""
         try:
             # Build request payload for Jina API
@@ -128,7 +127,7 @@ class JinaRerankFunction:
             logger.error("Unexpected error in Jina rerank request", error=str(e))
             return []
 
-    def __call__(self, query: str, documents: List[str], top_k: int = 1) -> List[RerankResult]:
+    def __call__(self, query: str, documents: list[str], top_k: int = 1) -> list[RerankResult]:
         """Synchronous interface matching pymilvus JinaRerankFunction API.
 
         Args:

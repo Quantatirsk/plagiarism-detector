@@ -5,8 +5,9 @@
 通过绕过高级API开销来实现最快的DOCX文本提取。
 """
 
-from typing import Optional
+from typing import Optional, cast
 from lxml import etree
+from lxml.etree import _Element
 import zipfile
 from .readers_base import BaseParser
 import logging
@@ -14,8 +15,6 @@ import logging
 
 # 配置日志记录器
 logger = logging.getLogger(__name__)
-
-
 class DOCXParser(BaseParser):
     """
     使用直接XML解析的高性能DOCX解析器。
@@ -51,13 +50,13 @@ class DOCXParser(BaseParser):
                 namespace = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 
                 # 提取段落而不是单个文本节点
-                paragraphs = root.xpath('//w:p', namespaces=namespace)
+                paragraphs = cast(list[_Element], root.xpath('//w:p', namespaces=namespace))
 
                 # 从每个段落中提取文本
-                paragraph_texts = []
+                paragraph_texts: list[str] = []
                 for paragraph in paragraphs:
                     # 获取此段落内的所有文本节点
-                    text_nodes = paragraph.xpath('.//w:t/text()', namespaces=namespace)
+                    text_nodes = cast(list[str], paragraph.xpath('.//w:t/text()', namespaces=namespace))
                     paragraph_text = ''.join(text_nodes).strip()
 
                     if paragraph_text:  # 只添加非空段落
@@ -71,4 +70,4 @@ class DOCXParser(BaseParser):
             return None
 
     # 不再需要 get_supported_extensions() - 由 readers_parser_map.py 管理
-    # Linux 哲学：单一职责，只负解析
+    # Linux 哲学：单一职责，只负责解析

@@ -2,7 +2,9 @@
 LLM服务 - OpenAI兼容的语言模型服务
 用于生成抄袭检测报告和分析
 """
-from typing import List, Optional, Dict, Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
+
 import openai
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -31,10 +33,10 @@ class LLMService(BaseService):
     )
     async def chat_completion(
         self,
-        messages: List[Dict[str, Any]],
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[dict[str, Any]],
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         stream: bool = False,
         **kwargs
     ) -> Any:
@@ -92,10 +94,10 @@ class LLMService(BaseService):
 
     async def stream_chat_completion(
         self,
-        messages: List[Dict[str, Any]],
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[dict[str, Any]],
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs
     ) -> AsyncGenerator[str, None]:
         """
@@ -133,7 +135,7 @@ class LLMService(BaseService):
             self.logger.error("Stream chat completion failed", error=str(e))
             raise LLMError(f"Failed to stream chat completion: {e}")
 
-    async def get_models(self) -> List[Dict[str, Any]]:
+    async def get_models(self) -> list[dict[str, Any]]:
         """
         获取可用的模型列表
 
@@ -162,23 +164,23 @@ class LLMService(BaseService):
             self.logger.error("Failed to fetch models", error=str(e))
             raise LLMError(f"Failed to fetch models: {e}")
 
-    def create_system_message(self, content: str) -> Dict[str, str]:
+    def create_system_message(self, content: str) -> dict[str, str]:
         """创建系统消息"""
         return {"role": "system", "content": content}
 
-    def create_user_message(self, content: str) -> Dict[str, str]:
+    def create_user_message(self, content: str) -> dict[str, str]:
         """创建用户消息"""
         return {"role": "user", "content": content}
 
-    def create_assistant_message(self, content: str) -> Dict[str, str]:
+    def create_assistant_message(self, content: str) -> dict[str, str]:
         """创建助手消息"""
         return {"role": "assistant", "content": content}
 
     def create_multimodal_message(
         self,
         role: str,
-        parts: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        parts: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """
         创建多模态消息 (支持文本和图片)
 

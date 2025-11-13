@@ -1,16 +1,17 @@
 """
 LLM API endpoints - 支持聊天完成和流式响应
 """
-from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request
+import json
+from typing import Any
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-import json
 
-from backend.services.llm_service import LLMService
 from backend.api.deps import get_llm_service
-from backend.core.errors import create_http_exception, LLMError
-import structlog
+from backend.core.errors import LLMError, create_http_exception
+from backend.services.llm_service import LLMService
 
 router = APIRouter(prefix="/api/v1/llm", tags=["LLM"])
 logger = structlog.get_logger()
@@ -19,15 +20,15 @@ logger = structlog.get_logger()
 class ChatMessage(BaseModel):
     """聊天消息模型"""
     role: str = Field(..., description="消息角色: system/user/assistant")
-    content: str | List[Dict[str, Any]] = Field(..., description="消息内容 (文本或多模态)")
+    content: str | list[dict[str, Any]] = Field(..., description="消息内容 (文本或多模态)")
 
 
 class ChatCompletionRequest(BaseModel):
     """聊天完成请求模型"""
-    model: Optional[str] = Field(None, description="模型名称")
-    messages: List[ChatMessage] = Field(..., description="消息列表")
-    temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="生成温度")
-    max_tokens: Optional[int] = Field(None, ge=1, description="最大令牌数")
+    model: str | None = Field(None, description="模型名称")
+    messages: list[ChatMessage] = Field(..., description="消息列表")
+    temperature: float | None = Field(None, ge=0.0, le=2.0, description="生成温度")
+    max_tokens: int | None = Field(None, ge=1, description="最大令牌数")
     stream: bool = Field(False, description="是否流式响应")
 
 
@@ -42,7 +43,7 @@ class ModelInfo(BaseModel):
 class ModelsResponse(BaseModel):
     """模型列表响应"""
     object: str = "list"
-    data: List[ModelInfo]
+    data: list[ModelInfo]
 
 
 @router.post("/chat/completions")

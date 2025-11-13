@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-from typing import Any, Dict, List, Optional, Set, Tuple
-import numpy as np
 from dataclasses import dataclass
+from typing import Any
 
-from backend.services.base_service import BaseService, singleton
+import numpy as np
+
 from backend.core.logging import get_logger
+from backend.services.base_service import BaseService, singleton
 
 logger = get_logger(__name__)
 
@@ -18,7 +19,7 @@ class MinHashSignature:
     """MinHash signature for a document."""
     chunk_id: int
     signature: np.ndarray
-    shingles: Optional[Set[str]] = None
+    shingles: set[str] | None = None
 
 
 @dataclass
@@ -40,9 +41,9 @@ class MinHashProcessor:
         self.config = config
         self._hash_funcs = self._generate_hash_functions()
         # Cache for MinHash signatures
-        self._signature_cache: Dict[int, MinHashSignature] = {}
+        self._signature_cache: dict[int, MinHashSignature] = {}
 
-    def _generate_hash_functions(self) -> List[Tuple[int, int]]:
+    def _generate_hash_functions(self) -> list[tuple[int, int]]:
         """Generate hash function parameters (a, b) for MinHash."""
         # Use a large prime for modulo (must fit in uint32)
         self.prime = 4294967291  # Largest prime that fits in uint32
@@ -54,7 +55,7 @@ class MinHashProcessor:
 
         return list(zip(a_values.tolist(), b_values.tolist()))
 
-    def _create_shingles(self, text: str) -> Set[str]:
+    def _create_shingles(self, text: str) -> set[str]:
         """Create character-level n-grams (shingles) from text."""
         if len(text) < self.config.shingle_size:
             return {text}
@@ -133,13 +134,17 @@ class MinHashProcessor:
 
         return float(intersection) / union if union > 0 else 0.0
 
+    def get_cache_size(self) -> int:
+        """Get the number of cached signatures."""
+        return len(self._signature_cache)
+
 
 class LSHIndex:
     """Locality-Sensitive Hashing index for efficient similarity search."""
 
     def __init__(self, config: MinHashConfig):
         self.config = config
-        self.buckets: Dict[int, Dict[int, List[int]]] = {}
+        self.buckets: dict[int, dict[int, list[int]]] = {}
         self._initialize_buckets()
 
     def _initialize_buckets(self):
@@ -168,7 +173,7 @@ class LSHIndex:
 
             self.buckets[band_idx][band_hash].append(chunk_id)
 
-    def query(self, signature: MinHashSignature, exclude_id: Optional[int] = None) -> Set[int]:
+    def query(self, signature: MinHashSignature, exclude_id: int | None = None) -> set[int]:
         """Find candidate similar items using LSH."""
         candidates = set()
 
@@ -196,9 +201,9 @@ class MinHashFilterStage(BaseService):
 
     async def process_chunks(
         self,
-        chunks: Dict[int, str],
-        existing_signatures: Optional[Dict[int, MinHashSignature]] = None
-    ) -> Dict[int, MinHashSignature]:
+        chunks: dict[int, str],
+        existing_signatures: dict[int, MinHashSignature] | None = None
+    ) -> dict[int, MinHashSignature]:
         """Process chunks to compute MinHash signatures with parallel execution."""
         self._ensure_initialized()
 
@@ -246,10 +251,10 @@ class MinHashFilterStage(BaseService):
 
     async def find_similar_pairs(
         self,
-        left_signatures: Dict[int, MinHashSignature],
-        right_signatures: Dict[int, MinHashSignature],
-        threshold: Optional[float] = None
-    ) -> List[Tuple[int, int, float]]:
+        left_signatures: dict[int, MinHashSignature],
+        right_signatures: dict[int, MinHashSignature],
+        threshold: float | None = None
+    ) -> list[tuple[int, int, float]]:
         """Find similar pairs between two sets of documents."""
         self._ensure_initialized()
 
@@ -277,12 +282,12 @@ class MinHashFilterStage(BaseService):
 
         return similar_pairs
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get statistics about the MinHash processor."""
         self._ensure_initialized()
 
         return {
-            "cache_size": len(self.processor._signature_cache),
+            "cache_size": self.processor.get_cache_size(),
             "config": {
                 "shingle_size": self.config.shingle_size,
                 "num_perm": self.config.num_perm,
@@ -299,14 +304,14 @@ class MinHashFilterStage(BaseService):
             },
             "performance": {
                 "cache_hit_rate": self._get_cache_hit_rate(),
-                "signatures_cached": len(self.processor._signature_cache),
+                "signatures_cached": self.processor.get_cache_size(),
                 "max_cache_size": self.config.cache_size,
             }
         }
 
     def _get_cache_hit_rate(self) -> float:
         """Calculate cache hit rate."""
-        total = len(self.processor._signature_cache)
+        total = self.processor.get_cache_size()
         if total == 0:
             return 0.0
         # Estimate based on cache size vs max size

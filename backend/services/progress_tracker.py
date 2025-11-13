@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Optional, Any
+from typing import Any
 from uuid import uuid4
 
-from backend.services.base_service import BaseService, singleton
 from backend.core.logging import get_logger
+from backend.services.base_service import BaseService, singleton
 
 logger = get_logger(__name__)
 
@@ -40,9 +40,9 @@ class ProgressTask:
         task_id: str,
         task_type: ProgressType,
         description: str,
-        total_steps: Optional[int] = None,
-        parent_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        total_steps: int | None = None,
+        parent_id: str | None = None,
+        metadata: dict[str, Any] | None = None
     ):
         self.task_id = task_id
         self.task_type = task_type
@@ -53,19 +53,19 @@ class ProgressTask:
         self.progress_percent = 0.0
         self.parent_id = parent_id
         self.metadata = metadata or {}
-        self.created_at = datetime.utcnow()
-        self.started_at: Optional[datetime] = None
-        self.completed_at: Optional[datetime] = None
-        self.error_message: Optional[str] = None
-        self.current_message: Optional[str] = None
-        self.sub_tasks: List[str] = []
-        self._listeners: List[asyncio.Queue] = []
+        self.created_at = datetime.now(timezone.utc)
+        self.started_at: datetime | None = None
+        self.completed_at: datetime | None = None
+        self.error_message: str | None = None
+        self.current_message: str | None = None
+        self.sub_tasks: list[str] = []
+        self._listeners: list[asyncio.Queue] = []
         # 额外的进度信息
-        self.items_per_second: Optional[float] = None
-        self.estimated_seconds_remaining: Optional[float] = None
-        self.last_update_time: datetime = datetime.utcnow()
+        self.items_per_second: float | None = None
+        self.estimated_seconds_remaining: float | None = None
+        self.last_update_time: datetime = datetime.now(timezone.utc)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "task_id": self.task_id,
@@ -88,12 +88,29 @@ class ProgressTask:
             "estimated_seconds_remaining": self.estimated_seconds_remaining
         }
 
-    def _calculate_duration(self) -> Optional[float]:
+    def _calculate_duration(self) -> float | None:
         """Calculate task duration in seconds."""
         if not self.started_at:
             return None
-        end_time = self.completed_at or datetime.utcnow()
+        end_time = self.completed_at or datetime.now(timezone.utc)
         return (end_time - self.started_at).total_seconds()
+
+    def calculate_duration(self) -> float | None:
+        """Public method to calculate task duration in seconds."""
+        return self._calculate_duration()
+
+    def add_listener(self, queue: asyncio.Queue) -> None:
+        """Add a listener queue to this task."""
+        self._listeners.append(queue)
+
+    def remove_listener(self, queue: asyncio.Queue) -> None:
+        """Remove a listener queue from this task."""
+        if queue in self._listeners:
+            self._listeners.remove(queue)
+
+    def get_listeners(self) -> list[asyncio.Queue]:
+        """Get all listener queues for this task."""
+        return self._listeners
 
 
 @singleton
@@ -101,17 +118,17 @@ class ProgressTracker(BaseService):
     """Service for tracking progress of long-running operations."""
 
     def _initialize(self) -> None:
-        self._tasks: Dict[str, ProgressTask] = {}
-        self._task_futures: Dict[str, asyncio.Future] = {}
-        self._global_listeners: List[asyncio.Queue] = []
+        self._tasks: dict[str, ProgressTask] = {}
+        self._task_futures: dict[str, asyncio.Future] = {}
+        self._global_listeners: list[asyncio.Queue] = []
 
     def create_task(
         self,
         task_type: ProgressType,
         description: str,
-        total_steps: Optional[int] = None,
-        parent_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        total_steps: int | None = None,
+        parent_id: str | None = None,
+        metadata: dict[str, Any] | None = None
     ) -> str:
         """Create a new progress task."""
         self._ensure_initialized()
@@ -154,7 +171,7 @@ class ProgressTracker(BaseService):
 
         task = self._tasks[task_id]
         task.status = ProgressStatus.RUNNING
-        task.started_at = datetime.utcnow()
+        task.started_at = datetime.now(timezone.utc)
 
         logger.info(
             "progress_task_started",
@@ -168,9 +185,9 @@ class ProgressTracker(BaseService):
     async def update_progress(
         self,
         task_id: str,
-        current_step: Optional[int] = None,
-        progress_percent: Optional[float] = None,
-        message: Optional[str] = None
+        current_step: int | None = None,
+        progress_percent: float | None = None,
+        message: str | None = None
     ) -> None:
         """Update task progress."""
         self._ensure_initialized()
@@ -192,7 +209,7 @@ class ProgressTracker(BaseService):
             task.current_message = message
 
         # 计算速度和剩余时间
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         time_elapsed = (now - task.last_update_time).total_seconds()
 
         if time_elapsed > 0 and task.started_at and current_step is not None and task.current_step > 0:
@@ -220,7 +237,7 @@ class ProgressTracker(BaseService):
 
         await self._notify_listeners(task_id, "progress")
 
-    async def complete_task(self, task_id: str, message: Optional[str] = None) -> None:
+    async def complete_task(self, task_id: str, message: str | None = None) -> None:
         """Mark a task as completed."""
         self._ensure_initialized()
 
@@ -229,7 +246,7 @@ class ProgressTracker(BaseService):
 
         task = self._tasks[task_id]
         task.status = ProgressStatus.COMPLETED
-        task.completed_at = datetime.utcnow()
+        task.completed_at = datetime.now(timezone.utc)
         task.progress_percent = 100.0
 
         if message:
@@ -240,7 +257,7 @@ class ProgressTracker(BaseService):
             task_id=task_id,
             task_type=task.task_type,
             description=task.description,
-            duration_seconds=task._calculate_duration()
+            duration_seconds=task.calculate_duration()
         )
 
         await self._notify_listeners(task_id, "completed")
@@ -258,7 +275,7 @@ class ProgressTracker(BaseService):
 
         task = self._tasks[task_id]
         task.status = ProgressStatus.FAILED
-        task.completed_at = datetime.utcnow()
+        task.completed_at = datetime.now(timezone.utc)
         task.error_message = error_message
 
         logger.error(
@@ -267,7 +284,7 @@ class ProgressTracker(BaseService):
             task_type=task.task_type,
             description=task.description,
             error_message=error_message,
-            duration_seconds=task._calculate_duration()
+            duration_seconds=task.calculate_duration()
         )
 
         await self._notify_listeners(task_id, "failed")
@@ -285,7 +302,7 @@ class ProgressTracker(BaseService):
 
         task = self._tasks[task_id]
         task.status = ProgressStatus.CANCELLED
-        task.completed_at = datetime.utcnow()
+        task.completed_at = datetime.now(timezone.utc)
 
         logger.info(
             "progress_task_cancelled",
@@ -300,7 +317,7 @@ class ProgressTracker(BaseService):
         if task_id in self._task_futures:
             self._task_futures[task_id].cancel()
 
-    def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+    def get_task(self, task_id: str) -> dict[str, Any] | None:
         """Get task information."""
         self._ensure_initialized()
 
@@ -309,7 +326,7 @@ class ProgressTracker(BaseService):
 
         return self._tasks[task_id].to_dict()
 
-    def get_tasks_by_parent(self, parent_id: str) -> List[Dict[str, Any]]:
+    def get_tasks_by_parent(self, parent_id: str) -> list[dict[str, Any]]:
         """Get all subtasks of a parent task."""
         self._ensure_initialized()
 
@@ -319,7 +336,7 @@ class ProgressTracker(BaseService):
             if task.parent_id == parent_id
         ]
 
-    def get_active_tasks(self) -> List[Dict[str, Any]]:
+    def get_active_tasks(self) -> list[dict[str, Any]]:
         """Get all active (running) tasks."""
         self._ensure_initialized()
 
@@ -329,7 +346,7 @@ class ProgressTracker(BaseService):
             if task.status == ProgressStatus.RUNNING
         ]
 
-    def get_recent_tasks(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_recent_tasks(self, limit: int = 50) -> list[dict[str, Any]]:
         """Get recent tasks sorted by creation time."""
         self._ensure_initialized()
 
@@ -348,7 +365,8 @@ class ProgressTracker(BaseService):
         if task_id not in self._task_futures:
             raise ValueError(f"Task {task_id} not found")
 
-        return await self._task_futures[task_id]
+        from typing import cast
+        return cast(bool, await self._task_futures[task_id])
 
     def subscribe_task(self, task_id: str) -> asyncio.Queue:
         """Subscribe to updates for a specific task."""
@@ -357,8 +375,8 @@ class ProgressTracker(BaseService):
         if task_id not in self._tasks:
             raise ValueError(f"Task {task_id} not found")
 
-        queue = asyncio.Queue()
-        self._tasks[task_id]._listeners.append(queue)
+        queue: asyncio.Queue = asyncio.Queue()
+        self._tasks[task_id].add_listener(queue)
 
         return queue
 
@@ -366,7 +384,7 @@ class ProgressTracker(BaseService):
         """Subscribe to updates for all tasks."""
         self._ensure_initialized()
 
-        queue = asyncio.Queue()
+        queue: asyncio.Queue = asyncio.Queue()
         self._global_listeners.append(queue)
 
         return queue
@@ -376,9 +394,7 @@ class ProgressTracker(BaseService):
         self._ensure_initialized()
 
         if task_id in self._tasks:
-            task = self._tasks[task_id]
-            if queue in task._listeners:
-                task._listeners.remove(queue)
+            self._tasks[task_id].remove_listener(queue)
 
     def unsubscribe_all(self, queue: asyncio.Queue) -> None:
         """Unsubscribe from all task updates."""
@@ -399,12 +415,12 @@ class ProgressTracker(BaseService):
         }
 
         # Notify task-specific listeners
-        for queue in task._listeners[:]:
+        for queue in task.get_listeners()[:]:
             try:
                 queue.put_nowait(update)
             except asyncio.QueueFull:
                 # Remove full queues
-                task._listeners.remove(queue)
+                task.remove_listener(queue)
 
         # Notify global listeners
         for queue in self._global_listeners[:]:
@@ -418,7 +434,7 @@ class ProgressTracker(BaseService):
         """Clean up old completed tasks."""
         self._ensure_initialized()
 
-        cutoff_time = datetime.utcnow()
+        cutoff_time = datetime.now(timezone.utc)
         cutoff_seconds = older_than_hours * 3600
 
         tasks_to_remove = []
@@ -452,9 +468,9 @@ class ProgressContext:
         tracker: ProgressTracker,
         task_type: ProgressType,
         description: str,
-        total_steps: Optional[int] = None,
-        parent_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        total_steps: int | None = None,
+        parent_id: str | None = None,
+        metadata: dict[str, Any] | None = None
     ):
         self.tracker = tracker
         self.task_type = task_type
@@ -462,7 +478,7 @@ class ProgressContext:
         self.total_steps = total_steps
         self.parent_id = parent_id
         self.metadata = metadata
-        self.task_id: Optional[str] = None
+        self.task_id: str | None = None
 
     async def __aenter__(self) -> str:
         """Create and start the task."""
@@ -484,5 +500,5 @@ class ProgressContext:
             else:
                 await self.tracker.fail_task(
                     self.task_id,
-                    f"{exc_type.__name__}: {str(exc_val)}"
+                    f"{exc_type.__name__}: {exc_val!s}"
                 )

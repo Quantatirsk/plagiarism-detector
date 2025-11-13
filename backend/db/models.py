@@ -1,12 +1,12 @@
 """Database models for document library and pairwise comparison workflow."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
+from typing import ClassVar, Optional
 
-from sqlalchemy import Column, Enum as SAEnum, JSON, Text
+from sqlalchemy import JSON, Column, Text
+from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, Relationship, SQLModel
-
 
 # ---------------------------------------------------------------------------
 # Enumerations
@@ -57,16 +57,16 @@ class ComparePairStatus(str, Enum):
 class Project(SQLModel, table=True):
     """Grouping for related documents and comparison jobs."""
 
-    __tablename__ = "project"
+    __tablename__: ClassVar[str] = "project"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: Optional[str] = Field(default=None, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=1024)
-    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    id: int | None = Field(default=None, primary_key=True)
+    name: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=1024)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
 
-    documents: List["Document"] = Relationship(back_populates="project")
-    jobs: List["CompareJob"] = Relationship(back_populates="project")
+    documents: list["Document"] = Relationship(back_populates="project")
+    jobs: list["CompareJob"] = Relationship(back_populates="project")
 
 
 # ---------------------------------------------------------------------------
@@ -77,36 +77,36 @@ class Project(SQLModel, table=True):
 class Document(SQLModel, table=True):
     """Single uploaded document with processing metadata."""
 
-    __tablename__ = "document"
+    __tablename__: ClassVar[str] = "document"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     project_id: int = Field(foreign_key="project.id", nullable=False, index=True)
-    title: Optional[str] = Field(default=None, max_length=255)
-    filename: Optional[str] = Field(default=None, max_length=255)
-    source: Optional[str] = Field(default=None, max_length=120)
+    title: str | None = Field(default=None, max_length=255)
+    filename: str | None = Field(default=None, max_length=255)
+    source: str | None = Field(default=None, max_length=120)
     checksum: str = Field(max_length=128, index=True)
     status: DocumentStatus = Field(
         default=DocumentStatus.PENDING,
         sa_column=Column(SAEnum(DocumentStatus, name="document_status"), nullable=False),
     )
-    language: Optional[str] = Field(default=None, max_length=16)
+    language: str | None = Field(default=None, max_length=16)
     char_count: int = Field(default=0, nullable=False)
     paragraph_count: int = Field(default=0, nullable=False)
     sentence_count: int = Field(default=0, nullable=False)
-    processed_text: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
-    storage_path: Optional[str] = Field(default=None, max_length=500)
-    metadata_json: Optional[dict] = Field(default=None, sa_column=Column(JSON, nullable=True))
-    error_message: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
-    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
-    completed_at: Optional[datetime] = Field(default=None)
+    processed_text: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    storage_path: str | None = Field(default=None, max_length=500)
+    metadata_json: dict | None = Field(default=None, sa_column=Column(JSON, nullable=True))
+    error_message: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    completed_at: datetime | None = Field(default=None)
 
     project: Project = Relationship(back_populates="documents")
-    chunks: List["DocumentChunk"] = Relationship(back_populates="document")
-    left_pairs: List["ComparePair"] = Relationship(
+    chunks: list["DocumentChunk"] = Relationship(back_populates="document")
+    left_pairs: list["ComparePair"] = Relationship(
         back_populates="left_document", sa_relationship_kwargs={"foreign_keys": "ComparePair.left_document_id"}
     )
-    right_pairs: List["ComparePair"] = Relationship(
+    right_pairs: list["ComparePair"] = Relationship(
         back_populates="right_document", sa_relationship_kwargs={"foreign_keys": "ComparePair.right_document_id"}
     )
 
@@ -114,9 +114,9 @@ class Document(SQLModel, table=True):
 class DocumentChunk(SQLModel, table=True):
     """Paragraph or sentence chunk with offsets for a document version."""
 
-    __tablename__ = "document_chunk"
+    __tablename__: ClassVar[str] = "document_chunk"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     document_id: int = Field(foreign_key="document.id", nullable=False, index=True)
     chunk_type: ChunkGranularity = Field(
         sa_column=Column(SAEnum(ChunkGranularity, name="chunk_granularity"), nullable=False)
@@ -124,30 +124,30 @@ class DocumentChunk(SQLModel, table=True):
     chunk_index: int = Field(default=0, nullable=False)
     start_pos: int = Field(default=0, nullable=False)
     end_pos: int = Field(default=0, nullable=False)
-    parent_chunk_id: Optional[int] = Field(default=None, foreign_key="document_chunk.id", index=True)
+    parent_chunk_id: int | None = Field(default=None, foreign_key="document_chunk.id", index=True)
     text: str = Field(sa_column=Column(Text, nullable=False))
-    text_hash: Optional[str] = Field(default=None, max_length=128)
-    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    text_hash: str | None = Field(default=None, max_length=128)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
 
     document: Document = Relationship(back_populates="chunks")
     parent_chunk: Optional["DocumentChunk"] = Relationship(
         sa_relationship_kwargs={"remote_side": "DocumentChunk.id"}
     )
-    embeddings: List["ChunkEmbedding"] = Relationship(back_populates="chunk")
+    embeddings: list["ChunkEmbedding"] = Relationship(back_populates="chunk")
 
 
 class ChunkEmbedding(SQLModel, table=True):
     """Embedding metadata stored alongside vector index ids."""
 
-    __tablename__ = "chunk_embedding"
+    __tablename__: ClassVar[str] = "chunk_embedding"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     chunk_id: int = Field(foreign_key="document_chunk.id", nullable=False, unique=True)
     vector_id: str = Field(max_length=64, nullable=False, index=True)
     model: str = Field(max_length=120, nullable=False)
     dimension: int = Field(nullable=False)
-    norm: Optional[float] = Field(default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    norm: float | None = Field(default=None)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
 
     chunk: DocumentChunk = Relationship(back_populates="embeddings")
 
@@ -160,31 +160,31 @@ class ChunkEmbedding(SQLModel, table=True):
 class CompareJob(SQLModel, table=True):
     """Logical collection of many pairwise comparisons."""
 
-    __tablename__ = "compare_job"
+    __tablename__: ClassVar[str] = "compare_job"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     project_id: int = Field(foreign_key="project.id", nullable=False, index=True)
-    name: Optional[str] = Field(default=None, max_length=200)
+    name: str | None = Field(default=None, max_length=200)
     status: CompareJobStatus = Field(
         default=CompareJobStatus.DRAFT,
         sa_column=Column(SAEnum(CompareJobStatus, name="compare_job_status"), nullable=False),
     )
-    config_json: Optional[dict] = Field(default=None, sa_column=Column(JSON, nullable=True))
-    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
-    started_at: Optional[datetime] = Field(default=None)
-    completed_at: Optional[datetime] = Field(default=None)
+    config_json: dict | None = Field(default=None, sa_column=Column(JSON, nullable=True))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    started_at: datetime | None = Field(default=None)
+    completed_at: datetime | None = Field(default=None)
 
     project: Project = Relationship(back_populates="jobs")
-    pairs: List["ComparePair"] = Relationship(back_populates="job")
+    pairs: list["ComparePair"] = Relationship(back_populates="job")
 
 
 class ComparePair(SQLModel, table=True):
     """Represents the comparison of two documents."""
 
-    __tablename__ = "compare_pair"
+    __tablename__: ClassVar[str] = "compare_pair"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     job_id: int = Field(foreign_key="compare_job.id", nullable=False, index=True)
     left_document_id: int = Field(foreign_key="document.id", nullable=False, index=True)
     right_document_id: int = Field(foreign_key="document.id", nullable=False, index=True)
@@ -192,11 +192,11 @@ class ComparePair(SQLModel, table=True):
         default=ComparePairStatus.PENDING,
         sa_column=Column(SAEnum(ComparePairStatus, name="compare_pair_status"), nullable=False),
     )
-    metrics_json: Optional[dict] = Field(default=None, sa_column=Column(JSON, nullable=True))
-    created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
-    started_at: Optional[datetime] = Field(default=None)
-    completed_at: Optional[datetime] = Field(default=None)
+    metrics_json: dict | None = Field(default=None, sa_column=Column(JSON, nullable=True))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    started_at: datetime | None = Field(default=None)
+    completed_at: datetime | None = Field(default=None)
 
     job: CompareJob = Relationship(back_populates="pairs")
     left_document: Document = Relationship(
@@ -205,26 +205,26 @@ class ComparePair(SQLModel, table=True):
     right_document: Document = Relationship(
         back_populates="right_pairs", sa_relationship_kwargs={"foreign_keys": "ComparePair.right_document_id"}
     )
-    match_groups: List["MatchGroup"] = Relationship(back_populates="pair")
+    match_groups: list["MatchGroup"] = Relationship(back_populates="pair")
 
 
 class MatchGroup(SQLModel, table=True):
     """Paragraph-level match aggregation between two document versions."""
 
-    __tablename__ = "match_group"
+    __tablename__: ClassVar[str] = "match_group"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     pair_id: int = Field(foreign_key="compare_pair.id", nullable=False, index=True)
     left_chunk_id: int = Field(foreign_key="document_chunk.id", nullable=False, index=True)
     right_chunk_id: int = Field(foreign_key="document_chunk.id", nullable=False, index=True)
-    final_score: Optional[float] = Field(default=None)
-    semantic_score: Optional[float] = Field(default=None)
-    cross_score: Optional[float] = Field(default=None)
-    alignment_ratio: Optional[float] = Field(default=None)
+    final_score: float | None = Field(default=None)
+    semantic_score: float | None = Field(default=None)
+    cross_score: float | None = Field(default=None)
+    alignment_ratio: float | None = Field(default=None)
     span_count: int = Field(default=0, nullable=False)
     match_count: int = Field(default=0, nullable=False)
-    paragraph_spans_json: Optional[dict] = Field(default=None, sa_column=Column(JSON, nullable=True))
-    document_spans_json: Optional[dict] = Field(default=None, sa_column=Column(JSON, nullable=True))
+    paragraph_spans_json: list[dict] | None = Field(default=None, sa_column=Column(JSON, nullable=True))
+    document_spans_json: list[dict] | None = Field(default=None, sa_column=Column(JSON, nullable=True))
 
     pair: ComparePair = Relationship(back_populates="match_groups")
     details: list["MatchDetail"] = Relationship(back_populates="group")
@@ -233,31 +233,31 @@ class MatchGroup(SQLModel, table=True):
 class MatchDetail(SQLModel, table=True):
     """Sentence-level match detail within a paragraph grouping."""
 
-    __tablename__ = "match_detail"
+    __tablename__: ClassVar[str] = "match_detail"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     group_id: int = Field(foreign_key="match_group.id", nullable=False, index=True)
     left_chunk_id: int = Field(foreign_key="document_chunk.id", nullable=False, index=True)
     right_chunk_id: int = Field(foreign_key="document_chunk.id", nullable=False, index=True)
-    final_score: Optional[float] = Field(default=None)
-    semantic_score: Optional[float] = Field(default=None)
-    cross_score: Optional[float] = Field(default=None)
-    spans_json: Optional[dict] = Field(default=None, sa_column=Column(JSON, nullable=True))
+    final_score: float | None = Field(default=None)
+    semantic_score: float | None = Field(default=None)
+    cross_score: float | None = Field(default=None)
+    spans_json: list[dict] | None = Field(default=None, sa_column=Column(JSON, nullable=True))
 
     group: MatchGroup = Relationship(back_populates="details")
 
 
 __all__ = [
-    "Project",
+    "ChunkEmbedding",
+    "ChunkGranularity",
+    "CompareJob",
+    "CompareJobStatus",
+    "ComparePair",
+    "ComparePairStatus",
     "Document",
     "DocumentChunk",
-    "ChunkEmbedding",
-    "CompareJob",
-    "ComparePair",
-    "MatchGroup",
-    "MatchDetail",
     "DocumentStatus",
-    "ChunkGranularity",
-    "CompareJobStatus",
-    "ComparePairStatus",
+    "MatchDetail",
+    "MatchGroup",
+    "Project",
 ]

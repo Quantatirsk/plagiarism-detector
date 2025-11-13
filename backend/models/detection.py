@@ -1,8 +1,8 @@
 """
 检测数据模型 - 简化版：只保留双文档对比相关模型
 """
+
 from pydantic import BaseModel
-from typing import List, Optional
 
 
 class SimilarityMatch(BaseModel):

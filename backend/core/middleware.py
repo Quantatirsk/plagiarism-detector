@@ -4,41 +4,42 @@
 """
 import time
 import traceback
-from typing import Callable
+from collections.abc import Callable
+from typing import cast
 from uuid import uuid4
 
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from backend.core.errors import BaseApplicationError, InternalServerError, create_http_exception
+from backend.core.errors import BaseApplicationError
 
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
     """全局错误处理中间件"""
-    
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """处理请求并捕获所有异常"""
         # 生成请求ID用于追踪
         request_id = str(uuid4())
         request.state.request_id = request_id
-        
+
         # 记录请求开始时间
         start_time = time.time()
-        
+
         try:
             # 处理请求
             response = await call_next(request)
-            
+
             # 添加请求ID到响应头
             response.headers["X-Request-ID"] = request_id
-            
+
             # 记录处理时间
             process_time = time.time() - start_time
             response.headers["X-Process-Time"] = str(process_time)
-            
-            return response
-            
+
+            return cast(Response, response)
+
         except BaseApplicationError as e:
             # 处理自定义应用异常
             return self._create_error_response(
@@ -48,7 +49,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 message=e.message,
                 details=e.details
             )
-            
+
         except ValueError as e:
             # 处理值错误（通常是输入验证问题）
             return self._create_error_response(
@@ -58,7 +59,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 message=str(e),
                 details={"type": "ValueError"}
             )
-            
+
         except Exception as e:
             # 处理未预期的异常
             # 在开发模式下，返回详细的错误信息
@@ -66,12 +67,12 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 "type": type(e).__name__,
                 "traceback": traceback.format_exc() if self._is_development() else None
             }
-            
+
             # 记录错误（这里简化处理，实际应该使用日志系统）
             print(f"[ERROR] Request {request_id}: {e}")
             if self._is_development():
                 print(traceback.format_exc())
-            
+
             return self._create_error_response(
                 request_id=request_id,
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -79,14 +80,14 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 message="An unexpected error occurred",
                 details=details
             )
-    
+
     def _create_error_response(
         self,
         request_id: str,
         status_code: int,
         error_code: str,
         message: str,
-        details: dict = None
+        details: dict | None = None
     ) -> JSONResponse:
         """创建统一的错误响应"""
         content = {
@@ -97,13 +98,13 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 "request_id": request_id
             }
         }
-        
+
         return JSONResponse(
             status_code=status_code,
             content=content,
             headers={"X-Request-ID": request_id}
         )
-    
+
     def _is_development(self) -> bool:
         """判断是否为开发环境"""
         # 简化处理，实际应该从配置中读取
@@ -113,13 +114,13 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
 
 class RequestValidationMiddleware(BaseHTTPMiddleware):
     """请求验证中间件"""
-    
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """验证请求的基本要素"""
         # 检查Content-Type
         if request.method in ["POST", "PUT", "PATCH"]:
             content_type = request.headers.get("content-type", "")
-            
+
             # API端点应该接受JSON
             if request.url.path.startswith("/api/") and not content_type.startswith("application/json"):
                 # 除非是文件上传
@@ -133,19 +134,19 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
                             }
                         }
                     )
-        
+
         # 继续处理请求
         response = await call_next(request)
-        return response
+        return cast(Response, response)
 
 
 class CORSMiddleware(BaseHTTPMiddleware):
     """CORS处理中间件（简化版）"""
-    
-    def __init__(self, app, allow_origins: list = None):
+
+    def __init__(self, app, allow_origins: list | None = None):
         super().__init__(app)
         self.allow_origins = allow_origins or ["*"]
-    
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """添加CORS响应头"""
         # 处理OPTIONS请求
@@ -159,24 +160,24 @@ class CORSMiddleware(BaseHTTPMiddleware):
                     "Access-Control-Max-Age": "3600"
                 }
             )
-        
+
         # 处理常规请求
         response = await call_next(request)
-        
+
         # 添加CORS头
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "*"
-        
-        return response
+
+        return cast(Response, response)
 
 
 # 简单的错误处理函数 - 遵循Linus原则
 async def error_handler(request: Request, exc: Exception):
     """全局错误处理"""
     from fastapi import HTTPException
-    
+
     if isinstance(exc, BaseApplicationError):
         return JSONResponse(
             status_code=exc.status_code,

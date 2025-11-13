@@ -1,18 +1,17 @@
 """Comparison job APIs for managing pairwise detection."""
 from __future__ import annotations
 
-from typing import List, Optional
-
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Query, Response
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import NoResultFound
 
 from backend.core.logging import get_logger
-from sqlalchemy.exc import NoResultFound
 from backend.db.models import ChunkGranularity, CompareJobStatus, ComparePairStatus
-from backend.services.comparison_service import ComparisonService, ComparisonConfig
-from backend.services.detection_orchestrator import DetectionOrchestrator
+
 # Legacy pipeline imports removed
 from backend.models.detection_modes import DetectionMode
+from backend.services.comparison_service import ComparisonConfig, ComparisonService
+from backend.services.detection_orchestrator import DetectionOrchestrator
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/compare-jobs", tags=["Comparison"])
@@ -28,23 +27,23 @@ def _comparison_service() -> ComparisonService:
 
 class JobCreateRequest(BaseModel):
     project_id: int
-    name: Optional[str] = None
-    config: Optional[dict] = None
+    name: str | None = None
+    config: dict | None = None
 
 
 class JobResponse(BaseModel):
     id: int
     project_id: int
-    name: Optional[str]
+    name: str | None
     status: CompareJobStatus
-    created_at: Optional[str]
-    updated_at: Optional[str]
-    config: Optional[dict]
+    created_at: str | None
+    updated_at: str | None
+    config: dict | None
 
     @classmethod
-    def from_model(cls, job):
+    def from_model(cls, job) -> JobResponse:
         return cls(
-            id=job.id,
+            id=job.id or 0,
             project_id=job.project_id,
             name=job.name,
             status=job.status,
@@ -55,7 +54,7 @@ class JobResponse(BaseModel):
 
 
 class JobListResponse(BaseModel):
-    items: List[JobResponse]
+    items: list[JobResponse]
 
 
 @router.post("", response_model=JobResponse, summary="Create a comparison job")
@@ -72,7 +71,7 @@ async def create_job(
 
 @router.get("", response_model=JobListResponse, summary="List comparison jobs")
 async def list_jobs(
-    project_id: Optional[int] = Query(None, description="Filter by project"),
+    project_id: int | None = Query(None, description="Filter by project"),
     orchestrator: DetectionOrchestrator = Depends(_orchestrator),
 ) -> JobListResponse:
     jobs = await orchestrator.list_compare_jobs(project_id=project_id)
@@ -86,7 +85,7 @@ class PairSpec(BaseModel):
 
 
 class PairCreateRequest(BaseModel):
-    pairs: List[PairSpec] = Field(..., min_items=1)
+    pairs: list[PairSpec] = Field(..., min_length=1)
     execute: bool = Field(default=True, description="Run comparison immediately")
     # New detection mode option
     mode: DetectionMode = Field(
@@ -94,9 +93,9 @@ class PairCreateRequest(BaseModel):
         description="Detection mode: pure_semantic, aggressive, fast, strict"
     )
     # Optional overrides
-    semantic_threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Override semantic threshold")
-    final_threshold: Optional[float] = Field(None, ge=0.0, le=1.0, description="Override final threshold")
-    top_k: Optional[int] = Field(None, ge=1, le=200, description="Override top-k candidates")
+    semantic_threshold: float | None = Field(None, ge=0.0, le=1.0, description="Override semantic threshold")
+    final_threshold: float | None = Field(None, ge=0.0, le=1.0, description="Override final threshold")
+    top_k: int | None = Field(None, ge=1, le=200, description="Override top-k candidates")
     # Pipeline options removed - use mode instead
     granularity: ChunkGranularity = Field(
         default=ChunkGranularity.PARAGRAPH,
@@ -110,12 +109,12 @@ class PairResponse(BaseModel):
     left_document_id: int
     right_document_id: int
     status: ComparePairStatus
-    metrics: Optional[dict]
+    metrics: dict | None
 
     @classmethod
     def from_model(cls, pair):
         return cls(
-            id=pair.id,
+            id=pair.id or 0,
             job_id=pair.job_id,
             left_document_id=pair.left_document_id,
             right_document_id=pair.right_document_id,
@@ -125,7 +124,7 @@ class PairResponse(BaseModel):
 
 
 class PairListResponse(BaseModel):
-    items: List[PairResponse]
+    items: list[PairResponse]
 
 
 @router.post("/{job_id}/pairs", response_model=PairListResponse, summary="Create comparison pairs")
@@ -170,7 +169,7 @@ async def create_pairs(
             else:
                 await orchestrator.update_compare_job_status(job_id, status=CompareJobStatus.COMPLETED)
 
-        pair_ids = [pair.id for pair in pairs]
+        pair_ids = [pair.id for pair in pairs if pair.id is not None]
         background_tasks.add_task(_execute_pairs, job_id, pair_ids, config)
 
     return PairListResponse(items=[PairResponse.from_model(pair) for pair in pairs])
@@ -213,34 +212,34 @@ class MatchGroup(BaseModel):
     id: int
     left_chunk_id: int
     right_chunk_id: int
-    final_score: Optional[float]
-    semantic_score: Optional[float]
-    cross_score: Optional[float]
-    alignment_ratio: Optional[float]
+    final_score: float | None
+    semantic_score: float | None
+    cross_score: float | None
+    alignment_ratio: float | None
     span_count: int
     match_count: int
-    paragraph_spans: Optional[List[dict]]
-    document_spans: Optional[List[dict]]
+    paragraph_spans: list[dict] | None
+    document_spans: list[dict] | None
 
 
 class MatchDetailModel(BaseModel):
     group_id: int
     left_chunk_id: int
     right_chunk_id: int
-    final_score: Optional[float]
-    semantic_score: Optional[float]
-    cross_score: Optional[float]
-    spans: Optional[List[dict]]
-    left_excerpt: Optional[str] = None
-    right_excerpt: Optional[str] = None
+    final_score: float | None
+    semantic_score: float | None
+    cross_score: float | None
+    spans: list[dict] | None
+    left_excerpt: str | None = None
+    right_excerpt: str | None = None
 
 
 class PairReportResponse(BaseModel):
     pair: PairResponse
     left_document_id: int
     right_document_id: int
-    groups: List[MatchGroup]
-    details: List[MatchDetailModel]
+    groups: list[MatchGroup]
+    details: list[MatchDetailModel]
 
 
 @router.get("/pairs/{pair_id}", response_model=PairReportResponse, summary="Get comparison report for pair")
@@ -252,7 +251,7 @@ async def get_pair_report(
     pair = PairResponse.from_model(report.pair)
     groups = [
         MatchGroup(
-            id=group.id,
+            id=group.id or 0,  # 数据库已保存的记录必有 id
             left_chunk_id=group.left_chunk_id,
             right_chunk_id=group.right_chunk_id,
             final_score=group.final_score,
@@ -282,8 +281,8 @@ async def get_pair_report(
 
     return PairReportResponse(
         pair=pair,
-        left_document_id=report.left_document.id,
-        right_document_id=report.right_document.id,
+        left_document_id=report.left_document.id or 0,
+        right_document_id=report.right_document.id or 0,
         groups=groups,
         details=details,
     )

@@ -1,7 +1,6 @@
 """Detection mode enumerations for simplified configuration."""
-from enum import Enum
-from typing import Optional
 from dataclasses import dataclass
+from enum import Enum
 
 # Legacy pipeline imports removed
 from backend.services.aggressive_similarity_pipeline import AggressivePipelineConfig
@@ -23,7 +22,7 @@ class DetectionModeConfig:
     name: str
     description: str
     # All modes use aggressive pipeline
-    aggressive_config: Optional[AggressivePipelineConfig] = None
+    aggressive_config: AggressivePipelineConfig | None = None
 
 
 # Pre-configured detection modes
@@ -84,9 +83,9 @@ DETECTION_MODE_CONFIGS = {
 
 def get_detection_config(
     mode: DetectionMode,
-    semantic_threshold_override: Optional[float] = None,
-    final_threshold_override: Optional[float] = None,
-    top_k_override: Optional[int] = None,
+    semantic_threshold_override: float | None = None,
+    final_threshold_override: float | None = None,
+    top_k_override: int | None = None,
 ) -> DetectionModeConfig:
     """Get detection configuration with optional overrides."""
 
@@ -98,11 +97,13 @@ def get_detection_config(
         from copy import deepcopy
         config = deepcopy(config)
 
-        if semantic_threshold_override is not None:
-            config.aggressive_config.semantic_threshold = semantic_threshold_override
-        if final_threshold_override is not None:
-            config.aggressive_config.final_threshold = final_threshold_override
-        if top_k_override is not None:
-            config.aggressive_config.top_k = top_k_override
+        # After deepcopy, aggressive_config should still exist
+        if config.aggressive_config:
+            if semantic_threshold_override is not None:
+                config.aggressive_config.semantic_threshold = semantic_threshold_override
+            if final_threshold_override is not None:
+                config.aggressive_config.final_threshold = final_threshold_override
+            if top_k_override is not None:
+                config.aggressive_config.top_k = top_k_override
 
     return config

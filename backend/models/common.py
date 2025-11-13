@@ -1,29 +1,30 @@
 """
 通用数据模型 - 共享的枚举和基础模型
 """
-from pydantic import BaseModel
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel
 
 
 class ResponseBase(BaseModel):
     """基础响应模型"""
     success: bool
-    message: Optional[str] = None
-    data: Optional[Dict[str, Any]] = None
+    message: str | None = None
+    data: dict[str, Any] | None = None
 
 
 class PaginationParams(BaseModel):
     """分页参数"""
     page: int = 1
     size: int = 50
-    total: Optional[int] = None
+    total: int | None = None
 
 
 class TimestampedModel(BaseModel):
     """带时间戳的基础模型"""
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 
 class TaskStatus(str):

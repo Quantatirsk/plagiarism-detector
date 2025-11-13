@@ -1,14 +1,16 @@
 """Orchestration layer for document ingestion and pairwise comparison."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, cast, Any
+from typing import Any, cast
 
-from sqlmodel import select, col
+from sqlmodel import col, select
 
 from backend.core.errors import DocumentParseError, EmbeddingError, StorageError
+from backend.core.logging import LogEvent, get_logger
 from backend.db import get_session
 from backend.db.models import (
     ChunkGranularity,
@@ -25,6 +27,8 @@ from backend.db.models import (
 )
 from backend.services.base_service import BaseService, singleton
 from backend.services.document_parser import DocumentParser
+from backend.services.embedding_service import EmbeddingService
+from backend.services.progress_tracker import ProgressTracker, ProgressType
 from backend.services.storage_gateway import (
     ChunkCreate,
     CompareJobCreate,
@@ -37,10 +41,7 @@ from backend.services.storage_gateway import (
     StorageGateway,
 )
 from backend.services.text_processor import TextProcessor
-from backend.services.embedding_service import EmbeddingService
 from backend.services.vector_storage import MilvusStorage
-from backend.services.progress_tracker import ProgressTracker, ProgressType
-from backend.core.logging import get_logger, LogEvent
 
 logger = get_logger(__name__)
 
@@ -55,8 +56,8 @@ class CompareReport:
     pair: ComparePair
     left_document: Document
     right_document: Document
-    groups: List[MatchGroup]
-    details: List[MatchDetail]
+    groups: list[MatchGroup]
+    details: list[MatchDetail]
 
 
 @singleton
@@ -75,15 +76,15 @@ class DetectionOrchestrator(BaseService):
     # Project management
     # ------------------------------------------------------------------
 
-    async def create_project(self, name: Optional[str], description: Optional[str]) -> Project:
+    async def create_project(self, name: str | None, description: str | None) -> Project:
         self._ensure_initialized()
         return await self.gateway.create_project(ProjectCreate(name=name, description=description))
 
-    async def list_projects(self) -> List[Project]:
+    async def list_projects(self) -> list[Project]:
         self._ensure_initialized()
         return await self.gateway.list_projects()
 
-    async def fetch_project(self, project_id: int) -> Optional[Project]:
+    async def fetch_project(self, project_id: int) -> Project | None:
         self._ensure_initialized()
         return await self.gateway.fetch_project(project_id)
 
@@ -95,15 +96,15 @@ class DetectionOrchestrator(BaseService):
         self,
         *,
         project_id: int,
-        title: Optional[str],
-        filename: Optional[str],
-        source: Optional[str],
+        title: str | None,
+        filename: str | None,
+        source: str | None,
         checksum: str,
-        processed_text: Optional[str],
-        language: Optional[str],
+        processed_text: str | None,
+        language: str | None,
         char_count: int,
-        metadata: Optional[dict],
-        storage_path: Optional[str],
+        metadata: dict | None,
+        storage_path: str | None,
     ) -> UploadedDocument:
         """Create document + version records for an uploaded file."""
         self._ensure_initialized()
@@ -126,12 +127,12 @@ class DetectionOrchestrator(BaseService):
 
     async def ingest_files_batch(
         self,
-        file_paths: List[str],
+        file_paths: list[str],
         *,
         project_id: int,
-        titles: Optional[List[str]] = None,
-        sources: Optional[List[str]] = None,
-    ) -> List[UploadedDocument]:
+        titles: list[str] | None = None,
+        sources: list[str] | None = None,
+    ) -> list[UploadedDocument]:
         """批量解析、分块和嵌入多个文档"""
         self._ensure_initialized()
 
@@ -152,8 +153,8 @@ class DetectionOrchestrator(BaseService):
         )
 
         # Convert None to list of None values to match expected types
-        actual_titles: List[Optional[str]] = cast(List[Optional[str]], titles) if titles is not None else [None for _ in range(len(file_paths))]
-        actual_sources: List[Optional[str]] = cast(List[Optional[str]], sources) if sources is not None else [None for _ in range(len(file_paths))]
+        actual_titles: list[str | None] = cast("list[str | None]", titles) if titles is not None else [None for _ in range(len(file_paths))]
+        actual_sources: list[str | None] = cast("list[str | None]", sources) if sources is not None else [None for _ in range(len(file_paths))]
 
         # 批量解析文档
         contents = []
@@ -200,7 +201,7 @@ class DetectionOrchestrator(BaseService):
         )
 
         # 处理每个有效文档
-        uploaded_documents = []
+        uploaded_documents: list[UploadedDocument] = []
         for idx, (content, result) in enumerate(zip(contents, processed_results)):
             original_idx = valid_indices[idx]
             file_path = file_paths[original_idx]
@@ -256,7 +257,7 @@ class DetectionOrchestrator(BaseService):
                     raise ValueError("Document ID is None")
                 paragraphs = await self.persist_chunks(upload.document.id, paragraph_payloads)
 
-                sentence_payloads: List[ChunkCreate] = []
+                sentence_payloads: list[ChunkCreate] = []
                 paragraph_lookup = self._build_parent_lookup(paragraphs)
                 for index, (sentence_text, start, end) in enumerate(result['sentences'], start=len(paragraphs)):
                     parent_chunk_id = self._locate_parent_chunk(start, end, paragraph_lookup)
@@ -316,7 +317,7 @@ class DetectionOrchestrator(BaseService):
 
                 await self.progress_tracker.fail_task(
                     doc_task_id,
-                    error_message=f"Failed: {str(exc)}"
+                    error_message=f"Failed: {exc!s}"
                 )
                 if upload.document.id is not None:
                     await self.mark_document_status(
@@ -344,8 +345,8 @@ class DetectionOrchestrator(BaseService):
         file_path: str,
         *,
         project_id: int,
-        title: Optional[str] = None,
-        source: Optional[str] = None,
+        title: str | None = None,
+        source: str | None = None,
     ) -> UploadedDocument:
         """Parse, chunk, and embed a document located at file_path."""
 
@@ -444,7 +445,7 @@ class DetectionOrchestrator(BaseService):
             )
 
             sentences = self.text_processor.split_sentences(content)
-            sentence_payloads: List[ChunkCreate] = []
+            sentence_payloads: list[ChunkCreate] = []
             paragraph_lookup = self._build_parent_lookup(paragraphs)
             for index, (sentence_text, start, end) in enumerate(sentences, start=len(paragraphs)):
                 parent_chunk_id = self._locate_parent_chunk(start, end, paragraph_lookup)
@@ -522,7 +523,7 @@ class DetectionOrchestrator(BaseService):
             )
             await self.progress_tracker.fail_task(
                 task_id,
-                error_message=f"Failed to process document: {str(exc)}"
+                error_message=f"Failed to process document: {exc!s}"
             )
             if upload.document.id is not None:
                 await self.mark_document_status(
@@ -678,7 +679,7 @@ class DetectionOrchestrator(BaseService):
             )
             await self.progress_tracker.fail_task(
                 task_id,
-                error_message=f"Failed to process document: {str(exc)}"
+                error_message=f"Failed to process document: {exc!s}"
             )
             await self.mark_document_status(
                 document_id,
@@ -695,9 +696,9 @@ class DetectionOrchestrator(BaseService):
         document_id: int,
         *,
         status: DocumentStatus,
-        paragraph_count: Optional[int] = None,
-        sentence_count: Optional[int] = None,
-        error_message: Optional[str] = None,
+        paragraph_count: int | None = None,
+        sentence_count: int | None = None,
+        error_message: str | None = None,
     ) -> Document:
         """Update processing status for a document."""
         self._ensure_initialized()
@@ -713,7 +714,7 @@ class DetectionOrchestrator(BaseService):
         self,
         version_id: int,
         chunks: Sequence[ChunkCreate],
-    ) -> List[DocumentChunk]:
+    ) -> list[DocumentChunk]:
         """Store chunk metadata for a processed document version."""
         self._ensure_initialized()
         return await self.gateway.store_chunks(version_id, chunks)
@@ -726,13 +727,13 @@ class DetectionOrchestrator(BaseService):
     # Comparison jobs
     # ------------------------------------------------------------------
 
-    async def create_compare_job(self, project_id: int, name: Optional[str], config: Optional[dict]) -> CompareJob:
+    async def create_compare_job(self, project_id: int, name: str | None, config: dict | None) -> CompareJob:
         self._ensure_initialized()
         return await self.gateway.create_compare_job(
             CompareJobCreate(project_id=project_id, name=name, config=config)
         )
 
-    async def run_project_comparisons(self, project_id: int) -> Optional[CompareJob]:
+    async def run_project_comparisons(self, project_id: int) -> CompareJob | None:
         self._ensure_initialized()
 
         logger.info(
@@ -786,7 +787,7 @@ class DetectionOrchestrator(BaseService):
         }
 
         document_ids = [document.id for document in documents if document.id is not None]
-        new_pairs: List[tuple[int, int]] = []
+        new_pairs: list[tuple[int, int]] = []
         for index, left_id in enumerate(document_ids):
             for right_id in document_ids[index + 1 :]:
                 key = (min(left_id, right_id), max(left_id, right_id))
@@ -825,7 +826,10 @@ class DetectionOrchestrator(BaseService):
 
         created_pairs = await self.add_pairs_to_job(job.id, new_pairs)
 
-        from backend.services.comparison_service import ComparisonConfig, ComparisonService  # late import to avoid circular
+        from backend.services.comparison_service import (  # late import to avoid circular
+            ComparisonConfig,
+            ComparisonService,
+        )
 
         comparison_service = ComparisonService()
         config = ComparisonConfig()
@@ -873,7 +877,7 @@ class DetectionOrchestrator(BaseService):
             )
             await self.progress_tracker.fail_task(
                 job_task_id,
-                error_message=f"Comparison job failed: {str(e)}"
+                error_message=f"Comparison job failed: {e!s}"
             )
             await self.update_compare_job_status(job.id, CompareJobStatus.FAILED)
             raise
@@ -900,7 +904,7 @@ class DetectionOrchestrator(BaseService):
         self,
         job_id: int,
         pairs: Sequence[tuple[int, int]],
-    ) -> List[ComparePair]:
+    ) -> list[ComparePair]:
         self._ensure_initialized()
         payloads = [
             ComparePairCreate(job_id=job_id, left_document_id=left, right_document_id=right)
@@ -913,33 +917,33 @@ class DetectionOrchestrator(BaseService):
         pair_id: int,
         *,
         status: ComparePairStatus,
-        metrics: Optional[dict] = None,
+        metrics: dict | None = None,
     ) -> ComparePair:
         self._ensure_initialized()
         return await self.gateway.update_pair_status(pair_id, status=status, metrics=metrics)
 
     async def persist_match_results(
         self,
-        pair_id: int,  # noqa: ARG002
+        pair_id: int,
         groups: Sequence[MatchGroupCreate],
         details: Sequence[MatchDetailCreate],
     ) -> None:
         self._ensure_initialized()
         stored_groups = await self.gateway.store_match_groups(groups)
-        mapping: Dict[tuple[int, int], int] = {}
+        mapping: dict[tuple[int, int], int] = {}
         for payload, stored in zip(groups, stored_groups):
             key = (payload.left_chunk_id, payload.right_chunk_id)
             if stored.id is not None:
                 mapping[key] = stored.id
 
-        normalised_details: List[MatchDetailCreate] = []
+        normalised_details: list[MatchDetailCreate] = []
         for detail in details:
             if detail.group_id is not None and isinstance(detail.group_id, int):
                 group_id = detail.group_id
             else:
-                key = detail.group_key or detail.group_id
+                temp_key: tuple[int, int] | int | None = detail.group_key or detail.group_id
                 try:
-                    group_id = mapping.get(tuple(key)) if key else None  # type: ignore
+                    group_id = mapping.get(tuple(temp_key)) if temp_key else None  # type: ignore
                 except TypeError:
                     group_id = None
             if group_id is None:
@@ -971,9 +975,9 @@ class DetectionOrchestrator(BaseService):
 
     async def list_documents(
         self,
-        status: Optional[DocumentStatus] = None,
-        project_id: Optional[int] = None,
-    ) -> List[Document]:
+        status: DocumentStatus | None = None,
+        project_id: int | None = None,
+    ) -> list[Document]:
         self._ensure_initialized()
         async with get_session() as session:
             stmt = select(Document)
@@ -985,7 +989,7 @@ class DetectionOrchestrator(BaseService):
             result = await session.exec(stmt)
             return list(result.all())
 
-    async def list_compare_jobs(self, project_id: Optional[int] = None) -> List[CompareJob]:
+    async def list_compare_jobs(self, project_id: int | None = None) -> list[CompareJob]:
         self._ensure_initialized()
         async with get_session() as session:
             stmt = select(CompareJob)
@@ -995,30 +999,30 @@ class DetectionOrchestrator(BaseService):
             result = await session.exec(stmt)
             return list(result.all())
 
-    async def list_pairs_for_job(self, job_id: int) -> List[ComparePair]:
+    async def list_pairs_for_job(self, job_id: int) -> list[ComparePair]:
         self._ensure_initialized()
         async with get_session() as session:
             stmt = select(ComparePair).where(ComparePair.job_id == job_id)
             result = await session.exec(stmt)
             return list(result.all())
 
-    async def fetch_job(self, job_id: int) -> Optional[CompareJob]:
+    async def fetch_job(self, job_id: int) -> CompareJob | None:
         self._ensure_initialized()
         return await self.gateway.fetch_compare_job(job_id)
 
-    async def fetch_pair(self, pair_id: int) -> Optional[ComparePair]:
+    async def fetch_pair(self, pair_id: int) -> ComparePair | None:
         self._ensure_initialized()
         return await self.gateway.fetch_pair(pair_id)
 
     async def fetch_chunks(
         self,
         document_id: int,
-        chunk_type: Optional[ChunkGranularity] = None,
-    ) -> List[DocumentChunk]:
+        chunk_type: ChunkGranularity | None = None,
+    ) -> list[DocumentChunk]:
         self._ensure_initialized()
         return await self.gateway.fetch_chunks_by_document(document_id, chunk_type=chunk_type)
 
-    async def fetch_document(self, document_id: int) -> Optional[Document]:
+    async def fetch_document(self, document_id: int) -> Document | None:
         self._ensure_initialized()
         async with get_session() as session:
             return await session.get(Document, document_id)
@@ -1046,7 +1050,7 @@ class DetectionOrchestrator(BaseService):
     def _build_parent_lookup(
         self,
         paragraphs: Sequence[DocumentChunk],
-    ) -> List[tuple[int, int, DocumentChunk]]:
+    ) -> list[tuple[int, int, DocumentChunk]]:
         return [
             (paragraph.start_pos, paragraph.end_pos, paragraph)
             for paragraph in sorted(paragraphs, key=lambda item: item.start_pos)
@@ -1057,7 +1061,7 @@ class DetectionOrchestrator(BaseService):
         start: int,
         end: int,
         lookup: Sequence[tuple[int, int, DocumentChunk]],
-    ) -> Optional[int]:
+    ) -> int | None:
         for left, right, chunk in lookup:
             if start >= left and end <= right:
                 return chunk.id
@@ -1071,7 +1075,7 @@ class DetectionOrchestrator(BaseService):
         self,
         document: Document,
         sentence_chunks: Sequence[DocumentChunk],
-        task_id: Optional[str] = None,
+        task_id: str | None = None,
     ) -> None:
         if not sentence_chunks:
             return
@@ -1092,7 +1096,7 @@ class DetectionOrchestrator(BaseService):
             await self.progress_tracker.start_task(embed_task_id)
 
         # 进度回调函数
-        async def embedding_progress_callback(progress_info: Dict[str, Any]) -> None:
+        async def embedding_progress_callback(progress_info: dict[str, Any]) -> None:
             if embed_task_id:
                 await self.progress_tracker.update_progress(
                     embed_task_id,

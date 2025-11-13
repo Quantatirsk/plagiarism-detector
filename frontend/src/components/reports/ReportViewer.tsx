@@ -3,25 +3,24 @@
  * 支持文档、对比和项目三种类型的报告展示
  */
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, Button, Tag, Progress, Alert, Space, Typography, Segmented } from 'antd';
 import {
-  FileText,
-  Download,
-  RefreshCw,
-  CheckCircle,
-  AlertCircle,
-  Clock,
-  Eye,
-  Settings
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+  FileTextOutlined,
+  DownloadOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ClockCircleOutlined,
+  EyeOutlined,
+  SettingOutlined,
+  SyncOutlined,
+  ExclamationCircleOutlined,
+} from '@ant-design/icons';
 import { MarkdownRenderer } from '@/components/markdown';
 import { saveAs } from 'file-saver';
 import { generateProfessionalWordDocument, type WordReportData } from './ProfessionalWordExport';
+import { designSystem } from '@/styles/DesignSystem';
+
+const { Title, Text } = Typography;
 
 // 报告内容结构化类型
 export interface ReportContent {
@@ -88,9 +87,21 @@ export function ReportViewer({
   // 获取报告类型显示信息
   const getReportTypeInfo = (type: string) => {
     const typeMap = {
-      document: { label: '文档报告', icon: FileText, color: 'bg-blue-500' },
-      comparison: { label: '对比报告', icon: Eye, color: 'bg-green-500' },
-      project: { label: '项目报告', icon: Settings, color: 'bg-purple-500' }
+      document: {
+        label: '文档报告',
+        icon: FileTextOutlined,
+        color: designSystem.colors.primary[500]
+      },
+      comparison: {
+        label: '对比报告',
+        icon: EyeOutlined,
+        color: designSystem.colors.success[500]
+      },
+      project: {
+        label: '项目报告',
+        icon: SettingOutlined,
+        color: designSystem.colors.warning[500]
+      }
     };
     return typeMap[type as keyof typeof typeMap] || typeMap.document;
   };
@@ -118,85 +129,121 @@ export function ReportViewer({
     const isError = progress?.error || progress?.stage === 'error';
 
     return (
-      <Card className="mb-4">
-        <CardHeader className="pb-3 pt-4">
-          <CardTitle className="flex items-center gap-2 text-sm">
+      <Card style={{ marginBottom: designSystem.spacing[4] }}>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: designSystem.spacing[2] }}>
             {isError ? (
-              <AlertCircle className="h-4 w-4 text-red-500" />
+              <CloseCircleOutlined style={{ fontSize: 16, color: designSystem.colors.error[500] }} />
             ) : (
-              <RefreshCw className={cn("h-4 w-4", isGenerating && "animate-spin")} />
+              <SyncOutlined spin={isGenerating} style={{ fontSize: 16 }} />
             )}
-            报告生成进度
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pb-4">
+            <Text strong style={{ fontSize: designSystem.typography.fontSize.sm }}>
+              报告生成进度
+            </Text>
+          </div>
+
           {isError ? (
-            <Alert variant="destructive" className="py-2">
-              <AlertDescription className="text-xs">
-                生成失败: {progress?.error || '未知错误'}
-              </AlertDescription>
-            </Alert>
+            <Alert
+              message={`生成失败: ${progress?.error || '未知错误'}`}
+              type="error"
+              showIcon
+              icon={<ExclamationCircleOutlined />}
+              style={{ fontSize: designSystem.typography.fontSize.xs }}
+            />
           ) : (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">{getProgressStageText(progress?.stage || 'initializing')}</span>
-                <span className="font-mono font-semibold">{progressPercent}%</span>
+            <Space direction="vertical" style={{ width: '100%' }} size={parseInt(designSystem.spacing[3])}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: designSystem.typography.fontSize.xs
+              }}>
+                <Text type="secondary">
+                  {getProgressStageText(progress?.stage || 'initializing')}
+                </Text>
+                <Text strong style={{ fontFamily: 'monospace' }}>
+                  {progressPercent}%
+                </Text>
               </div>
-              <Progress value={progressPercent} className="w-full h-1.5" />
+              <Progress
+                percent={progressPercent}
+                showInfo={false}
+                strokeColor={designSystem.colors.primary[500]}
+              />
               {progress?.message && (
-                <p className="text-xs text-muted-foreground">{progress.message}</p>
+                <Text type="secondary" style={{ fontSize: designSystem.typography.fontSize.xs }}>
+                  {progress.message}
+                </Text>
               )}
               {progress?.estimated_remaining && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
+                <Text type="secondary" style={{
+                  fontSize: designSystem.typography.fontSize.xs,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: designSystem.spacing[1]
+                }}>
+                  <ClockCircleOutlined />
                   预计剩余 {progress.estimated_remaining} 秒
-                </p>
+                </Text>
               )}
-            </div>
+            </Space>
           )}
-        </CardContent>
+        </Space>
       </Card>
     );
   };
 
   // 渲染报告头部
-    const renderReportHeader = () => {
-      if (!report) return null;
+  const renderReportHeader = () => {
+    if (!report) return null;
 
     const typeInfo = getReportTypeInfo(report.type);
     const TypeIcon = typeInfo.icon;
 
     return (
-      <Card className="mb-4">
-        <CardHeader className="py-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-3">
-              <div className={cn("p-2 rounded-lg", typeInfo.color)}>
-                <TypeIcon className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-lg mb-1.5">{report.title}</CardTitle>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="secondary" className="text-[10px] h-5">{typeInfo.label}</Badge>
-                  <Badge variant="outline" className="text-[10px] h-5">{report.language === 'zh' ? '中文' : 'English'}</Badge>
-                  <span className="text-[11px]">{new Date(report.generated_at).toLocaleString('zh-CN')}</span>
-                </div>
-              </div>
+      <Card style={{ marginBottom: designSystem.spacing[4] }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start'
+        }}>
+          <div style={{ display: 'flex', gap: designSystem.spacing[3] }}>
+            <div style={{
+              padding: designSystem.spacing[2],
+              borderRadius: designSystem.borderRadius.lg,
+              backgroundColor: typeInfo.color,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <TypeIcon style={{ fontSize: 20, color: '#fff' }} />
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => handleExportWord(report)}
-                disabled={isGenerating}
-              >
-                <Download className="h-3.5 w-3.5 mr-1" />
-                导出报告
-              </Button>
+            <div>
+              <Title level={4} style={{ marginBottom: designSystem.spacing[1] }}>
+                {report.title}
+              </Title>
+              <Space size="small" wrap>
+                <Tag color="blue" style={{ fontSize: 10 }}>
+                  {typeInfo.label}
+                </Tag>
+                <Tag style={{ fontSize: 10 }}>
+                  {report.language === 'zh' ? '中文' : 'English'}
+                </Tag>
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  {new Date(report.generated_at).toLocaleString('zh-CN')}
+                </Text>
+              </Space>
             </div>
           </div>
-        </CardHeader>
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={() => handleExportWord(report)}
+            disabled={isGenerating}
+            size="small"
+          >
+            导出报告
+          </Button>
+        </div>
       </Card>
     );
   };
@@ -205,30 +252,33 @@ export function ReportViewer({
   const renderNavigation = () => {
     if (!report) return null;
 
-    const sections = [
-      { id: 'content', label: '详细内容', icon: Eye },
-      { id: 'data', label: '原始数据', icon: Settings }
-    ];
-
     return (
-      <div className="flex gap-1 mb-4 p-1 bg-muted/50 rounded-lg">
-        {sections.map((section) => {
-          const SectionIcon = section.icon;
-          const isActive = activeSection === section.id;
-
-          return (
-            <Button
-              key={section.id}
-              variant={isActive ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setActiveSection(section.id)}
-              className="flex-1 h-7 text-xs"
-            >
-              <SectionIcon className="h-3.5 w-3.5 mr-1.5" />
-              {section.label}
-            </Button>
-          );
-        })}
+      <div style={{ marginBottom: designSystem.spacing[4] }}>
+        <Segmented
+          value={activeSection}
+          onChange={(value) => setActiveSection(value as string)}
+          options={[
+            {
+              value: 'content',
+              label: (
+                <Space>
+                  <EyeOutlined />
+                  <span>详细内容</span>
+                </Space>
+              )
+            },
+            {
+              value: 'data',
+              label: (
+                <Space>
+                  <SettingOutlined />
+                  <span>原始数据</span>
+                </Space>
+              )
+            }
+          ]}
+          block
+        />
       </div>
     );
   };
@@ -247,65 +297,129 @@ export function ReportViewer({
         || structuredReport?.large_dataset_warning;
 
       return (
-        <Card>
-          <CardHeader className="py-3">
-            <CardTitle className="text-base">详细报告内容</CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4">
-            {report.summary && (
-              <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 p-3">
-                <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">
-                  <CheckCircle className="h-3.5 w-3.5" />
-                  概览摘要
-                </div>
-                <MarkdownRenderer content={report.summary} className="prose prose-sm text-muted-foreground [&>*]:text-xs [&>*]:leading-relaxed" />
+        <Card
+          title={
+            <Text strong style={{ fontSize: designSystem.typography.fontSize.base }}>
+              详细报告内容
+            </Text>
+          }
+        >
+          {report.summary && (
+            <div style={{
+              marginBottom: designSystem.spacing[4],
+              padding: designSystem.spacing[3],
+              borderRadius: designSystem.borderRadius.lg,
+              border: `1px solid ${designSystem.colors.primary[300]}`,
+              backgroundColor: `${designSystem.colors.primary[50]}`
+            }}>
+              <div style={{
+                marginBottom: designSystem.spacing[2],
+                display: 'flex',
+                alignItems: 'center',
+                gap: designSystem.spacing[2],
+                fontSize: 10,
+                fontWeight: designSystem.typography.fontWeight.semibold,
+                textTransform: 'uppercase',
+                letterSpacing: '0.24em',
+                color: designSystem.colors.primary[600]
+              }}>
+                <CheckCircleOutlined style={{ fontSize: 14 }} />
+                概览摘要
               </div>
-            )}
-            {datasetWarning && (
-              <div className="mb-3 rounded-lg border border-orange-300 bg-orange-100/70 px-2.5 py-2 text-xs text-orange-900">
-                {datasetWarning}
+              <div style={{ fontSize: designSystem.typography.fontSize.xs }}>
+                <MarkdownRenderer
+                  content={report.summary}
+                  className="prose prose-sm"
+                />
               </div>
-            )}
-            <div
-              id="report-content"
-              className="prose prose-sm max-w-none [&>*]:text-sm [&>*]:leading-relaxed"
-            >
-              {fullContent ? (
-                <MarkdownRenderer content={fullContent} />
-              ) : (
-                <p className="text-muted-foreground text-xs">暂无详细内容</p>
-              )}
             </div>
+          )}
 
-            {highlightedSegments && (
-              <div className="mt-4">
-                <h3 className="mb-1.5 text-xs font-semibold text-foreground uppercase tracking-wide">高相似片段列表 (≥ 0.8)</h3>
-                <div className="rounded-lg border border-border bg-muted/40 p-2 text-xs">
-                  <div
-                    className="markdown-renderer"
-                    dangerouslySetInnerHTML={{ __html: highlightedSegments }}
-                  />
-                </div>
-              </div>
+          {datasetWarning && (
+            <Alert
+              message={datasetWarning}
+              type="warning"
+              showIcon
+              style={{
+                marginBottom: designSystem.spacing[3],
+                fontSize: designSystem.typography.fontSize.xs
+              }}
+            />
+          )}
+
+          <div
+            id="report-content"
+            className="prose prose-sm max-w-none"
+            style={{ fontSize: designSystem.typography.fontSize.sm }}
+          >
+            {fullContent ? (
+              <MarkdownRenderer content={fullContent} />
+            ) : (
+              <Text type="secondary" style={{ fontSize: designSystem.typography.fontSize.xs }}>
+                暂无详细内容
+              </Text>
             )}
-          </CardContent>
+          </div>
+
+          {highlightedSegments && (
+            <div style={{ marginTop: designSystem.spacing[4] }}>
+              <Title
+                level={5}
+                style={{
+                  marginBottom: designSystem.spacing[2],
+                  fontSize: designSystem.typography.fontSize.xs,
+                  fontWeight: designSystem.typography.fontWeight.semibold,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}
+              >
+                高相似片段列表 (≥ 0.8)
+              </Title>
+              <div style={{
+                padding: designSystem.spacing[2],
+                borderRadius: designSystem.borderRadius.lg,
+                border: `1px solid ${designSystem.colors.neutral[200]}`,
+                backgroundColor: designSystem.colors.neutral[50],
+                fontSize: designSystem.typography.fontSize.xs
+              }}>
+                <div
+                  className="markdown-renderer"
+                  dangerouslySetInnerHTML={{ __html: highlightedSegments }}
+                />
+              </div>
+            </div>
+          )}
         </Card>
       );
     };
 
     const renderData = () => (
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-base">数据详情</CardTitle>
-          <p className="text-xs text-muted-foreground">报告生成所使用的原始数据</p>
-        </CardHeader>
-        <CardContent className="pb-4">
-          <div className="bg-muted p-3 rounded-lg overflow-auto max-h-96">
-            <pre className="text-xs">
-              {JSON.stringify(report.data, null, 2)}
-            </pre>
-          </div>
-        </CardContent>
+      <Card
+        title={
+          <Space direction="vertical" size={0}>
+            <Text strong style={{ fontSize: designSystem.typography.fontSize.base }}>
+              数据详情
+            </Text>
+            <Text type="secondary" style={{ fontSize: designSystem.typography.fontSize.xs }}>
+              报告生成所使用的原始数据
+            </Text>
+          </Space>
+        }
+      >
+        <div style={{
+          padding: designSystem.spacing[3],
+          borderRadius: designSystem.borderRadius.lg,
+          backgroundColor: designSystem.colors.neutral[50],
+          overflow: 'auto',
+          maxHeight: 384
+        }}>
+          <pre style={{
+            fontSize: designSystem.typography.fontSize.xs,
+            margin: 0
+          }}>
+            {JSON.stringify(report.data, null, 2)}
+          </pre>
+        </div>
       </Card>
     );
 
@@ -320,7 +434,7 @@ export function ReportViewer({
   };
 
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: designSystem.spacing[4] }}>
       {renderProgress()}
       {renderReportHeader()}
       {report && (
@@ -332,13 +446,28 @@ export function ReportViewer({
 
       {!report && !isGenerating && (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-10">
-            <FileText className="h-10 w-10 text-muted-foreground mb-3" />
-            <h3 className="text-base font-medium mb-1.5">暂无报告</h3>
-            <p className="text-muted-foreground text-center text-xs">
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: `${designSystem.spacing[10]} 0`
+          }}>
+            <FileTextOutlined style={{
+              fontSize: 40,
+              color: designSystem.colors.neutral[400],
+              marginBottom: designSystem.spacing[3]
+            }} />
+            <Title level={5} style={{ marginBottom: designSystem.spacing[2] }}>
+              暂无报告
+            </Title>
+            <Text type="secondary" style={{
+              fontSize: designSystem.typography.fontSize.xs,
+              textAlign: 'center'
+            }}>
               请选择文档或项目生成报告
-            </p>
-          </CardContent>
+            </Text>
+          </div>
         </Card>
       )}
     </div>

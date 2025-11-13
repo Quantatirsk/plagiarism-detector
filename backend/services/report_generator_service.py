@@ -1,21 +1,27 @@
 """
 报告生成服务 - 整合LLM、模板和数据处理，生成完整的抄袭检测报告
 """
+import html
 import json
 import uuid
-import html
-from typing import Dict, Any, Optional, AsyncGenerator
+from collections.abc import AsyncGenerator
 from datetime import datetime
+from typing import Any
 
 from backend.models.report_models import (
-    ReportType, ReportGenerationRequest, GeneratedReport,
-    DocumentReportData, ComparisonReportData, ProjectReportData,
-    ReportProgress, MatchDetail
+    ComparisonReportData,
+    DocumentReportData,
+    GeneratedReport,
+    MatchDetail,
+    ProjectReportData,
+    ReportGenerationRequest,
+    ReportProgress,
+    ReportType,
 )
 from backend.services.base_service import BaseService, singleton
 from backend.services.llm_service import LLMService
-from backend.services.report_template_service import ReportTemplateService
 from backend.services.report_data_processor import ReportDataProcessor
+from backend.services.report_template_service import ReportTemplateService
 from backend.services.service_factory import ServiceFactory
 
 
@@ -31,7 +37,7 @@ class ReportGeneratorService(BaseService):
         self.llm_service: LLMService = ServiceFactory.get_llm_service()
         self.template_service: ReportTemplateService = ReportTemplateService()
         self.data_processor: ReportDataProcessor = ReportDataProcessor()
-        self.active_generations: Dict[str, ReportProgress] = {}
+        self.active_generations: dict[str, ReportProgress] = {}
 
     async def generate_report(
         self,
@@ -140,7 +146,7 @@ class ReportGeneratorService(BaseService):
             return generated_report
 
         except Exception as e:
-            self._update_progress(task_id, -1, "error", f"生成失败: {str(e)}")
+            self._update_progress(task_id, -1, "error", f"生成失败: {e!s}")
             raise
 
     async def _generate_report_stream(
@@ -242,7 +248,7 @@ class ReportGeneratorService(BaseService):
         self,
         report_data,
         request: ReportGenerationRequest
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """准备模板数据"""
         if request.type == ReportType.DOCUMENT:
             return self._prepare_document_template_data(report_data)
@@ -253,7 +259,7 @@ class ReportGeneratorService(BaseService):
         else:
             raise ValueError(f"Unsupported report type: {request.type}")
 
-    def _prepare_document_template_data(self, data: DocumentReportData) -> Dict[str, Any]:
+    def _prepare_document_template_data(self, data: DocumentReportData) -> dict[str, Any]:
         """准备文档报告模板数据"""
         # 格式化来源分析
         sources_analysis = self._format_sources_analysis(data.sources)
@@ -274,7 +280,7 @@ class ReportGeneratorService(BaseService):
             'statistics': statistics
         }
 
-    def _prepare_comparison_template_data(self, data: ComparisonReportData) -> Dict[str, Any]:
+    def _prepare_comparison_template_data(self, data: ComparisonReportData) -> dict[str, Any]:
         """准备对比报告模板数据"""
         match_details = self._format_match_details(data.match_details)
         total_matches = len(data.match_details)
@@ -300,7 +306,7 @@ class ReportGeneratorService(BaseService):
             'side_by_side_analysis': side_by_side_analysis
         }
 
-    def _prepare_project_template_data(self, data: ProjectReportData) -> Dict[str, Any]:
+    def _prepare_project_template_data(self, data: ProjectReportData) -> dict[str, Any]:
         """准备项目报告模板数据"""
         return {
             'project_name': data.project_name,
@@ -340,7 +346,7 @@ class ReportGeneratorService(BaseService):
 
         return "\n".join(lines)
 
-    def _format_statistics(self, stats: Dict[str, Any]) -> str:
+    def _format_statistics(self, stats: dict[str, Any]) -> str:
         """格式化统计数据"""
         return f"""
 总来源数: {stats.get('total_sources', 0)}
@@ -382,7 +388,7 @@ class ReportGeneratorService(BaseService):
 
         return "\n".join(lines)
 
-    def _process_llm_response(self, response, template) -> Dict[str, Any]:
+    def _process_llm_response(self, response, template) -> dict[str, Any]:
         """处理LLM响应"""
         content = response.choices[0].message.content
 
@@ -427,8 +433,8 @@ class ReportGeneratorService(BaseService):
         self,
         request: ReportGenerationRequest,
         report_data,
-        llm_payload: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        llm_payload: dict[str, Any]
+    ) -> dict[str, Any]:
         full_content = llm_payload.get("full_content", "")
         sections = llm_payload.get("sections", {})
         generated_at = llm_payload.get("generated_at") or datetime.utcnow().isoformat()
@@ -456,7 +462,7 @@ class ReportGeneratorService(BaseService):
             }
         }
 
-    def _build_document_structure(self, data: DocumentReportData, include_sources: bool = True) -> Dict[str, Any]:
+    def _build_document_structure(self, data: DocumentReportData, include_sources: bool = True) -> dict[str, Any]:
         segments = [
             self._serialize_match_detail(
                 match,
@@ -495,7 +501,7 @@ class ReportGeneratorService(BaseService):
             "top_similarity_sources": sources
         }
 
-    def _build_comparison_structure(self, data: ComparisonReportData) -> Dict[str, Any]:
+    def _build_comparison_structure(self, data: ComparisonReportData) -> dict[str, Any]:
         segments = [
             self._serialize_match_detail(
                 match,
@@ -536,7 +542,7 @@ class ReportGeneratorService(BaseService):
             "side_by_side_highlights": data.side_by_side_sections
         }
 
-    def _build_project_structure(self, data: ProjectReportData) -> Dict[str, Any]:
+    def _build_project_structure(self, data: ProjectReportData) -> dict[str, Any]:
         high_risk_documents = [
             self._build_document_structure(doc, include_sources=False)
             for doc in data.high_risk_documents
@@ -560,9 +566,9 @@ class ReportGeneratorService(BaseService):
     def _serialize_match_detail(
         self,
         match: MatchDetail,
-        source_label: Optional[str] = None,
-        target_label: Optional[str] = None
-    ) -> Dict[str, Any]:
+        source_label: str | None = None,
+        target_label: str | None = None
+    ) -> dict[str, Any]:
         return {
             "similarity_score": self._round_score(match.similarity_score),
             "source": {
@@ -584,12 +590,12 @@ class ReportGeneratorService(BaseService):
             "match_type": match.match_type
         }
 
-    def _round_score(self, score: Optional[float]) -> Optional[float]:
+    def _round_score(self, score: float | None) -> float | None:
         if score is None:
             return None
         return round(float(score), 4)
 
-    def _build_similarity_table(self, segments: list[Dict[str, Any]]) -> str:
+    def _build_similarity_table(self, segments: list[dict[str, Any]]) -> str:
         if not segments:
             return "<p>未识别到符合阈值的相似片段。</p>"
 
@@ -629,7 +635,7 @@ class ReportGeneratorService(BaseService):
         footer = "  </tbody>\n</table>"
         return header + "\n".join(rows) + "\n" + footer
 
-    def _format_excerpt(self, text: Optional[str]) -> str:
+    def _format_excerpt(self, text: str | None) -> str:
         if not text:
             return "<em>无文本</em>"
         safe = html.escape(text)
@@ -646,7 +652,7 @@ class ReportGeneratorService(BaseService):
         else:
             return "抄袭检测报告"
 
-    def _extract_summary(self, content: Dict[str, Any]) -> str:
+    def _extract_summary(self, content: dict[str, Any]) -> str:
         """提取报告摘要"""
         full_content = content.get("full_content", "")
         return full_content.strip() if isinstance(full_content, str) else ""
@@ -669,7 +675,7 @@ class ReportGeneratorService(BaseService):
             self.active_generations[task_id].message = message
             self.logger.info(f"Report generation progress: {progress:.1%}", task_id=task_id, stage=stage)
 
-    def get_generation_progress(self, task_id: str) -> Optional[ReportProgress]:
+    def get_generation_progress(self, task_id: str) -> ReportProgress | None:
         """获取生成进度"""
         return self.active_generations.get(task_id)
 
@@ -677,6 +683,6 @@ class ReportGeneratorService(BaseService):
         """取消报告生成"""
         if task_id in self.active_generations:
             del self.active_generations[task_id]
-            self.logger.info(f"Report generation cancelled", task_id=task_id)
+            self.logger.info("Report generation cancelled", task_id=task_id)
             return True
         return False

@@ -4,7 +4,7 @@
 """
 import logging
 import sys
-from typing import Any, Dict, Optional
+from typing import Any
 
 import structlog
 from structlog.types import FilteringBoundLogger, Processor
@@ -13,7 +13,7 @@ from structlog.types import FilteringBoundLogger, Processor
 def configure_logging(
     level: str = "INFO",
     json_logs: bool = True,
-    log_file: Optional[str] = None
+    log_file: str | None = None
 ) -> None:
     """
     配置结构化日志系统
@@ -23,16 +23,16 @@ def configure_logging(
         json_logs: 是否输出JSON格式日志
         log_file: 日志文件路径（可选）
     """
-    
+
     # 设置Python标准日志级别
     log_level = getattr(logging, level.upper(), logging.INFO)
-    
+
     # 配置处理器链
     processors: list[Processor] = [
         # 添加时间戳
         structlog.stdlib.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
-        
+
         # 添加调用位置信息
         structlog.processors.CallsiteParameterAdder(
             parameters=[
@@ -41,15 +41,15 @@ def configure_logging(
                 structlog.processors.CallsiteParameter.FUNC_NAME,
             ]
         ),
-        
+
         # 添加异常信息格式化
         structlog.processors.StackInfoRenderer(),
         structlog.dev.set_exc_info,
-        
+
         # 格式化异常
         structlog.processors.format_exc_info,
     ]
-    
+
     # 根据环境选择渲染器
     if json_logs:
         # 生产环境：JSON格式
@@ -62,7 +62,7 @@ def configure_logging(
                 exception_formatter=structlog.dev.better_traceback
             )
         )
-    
+
     # 配置structlog
     structlog.configure(
         processors=processors,
@@ -70,25 +70,25 @@ def configure_logging(
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
-    
+
     # 配置标准库日志
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
         level=log_level,
     )
-    
+
     # 如果指定了日志文件，添加文件处理器
     if log_file:
         file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(log_level)
-        
+
         # 文件始终使用JSON格式
         json_formatter = structlog.stdlib.ProcessorFormatter(
             processor=structlog.processors.JSONRenderer(),
         )
         file_handler.setFormatter(json_formatter)
-        
+
         logging.getLogger().addHandler(file_handler)
 
 
@@ -98,36 +98,37 @@ def get_logger(
 ) -> FilteringBoundLogger:
     """
     获取结构化日志记录器
-    
+
     Args:
         name: 日志记录器名称（通常使用模块名）
         **initial_context: 初始上下文数据
-    
+
     Returns:
         配置好的日志记录器
     """
+    from typing import cast
     logger = structlog.get_logger(name)
-    
+
     # 绑定初始上下文
     if initial_context:
         logger = logger.bind(**initial_context)
-    
-    return logger
+
+    return cast(FilteringBoundLogger, logger)
 
 
 class LogContext:
     """日志上下文管理器"""
-    
+
     def __init__(self, logger: FilteringBoundLogger, **context: Any):
         self.logger = logger
         self.context = context
-        self.original_logger = None
-    
+        self.original_logger: FilteringBoundLogger | None = None
+
     def __enter__(self) -> FilteringBoundLogger:
         """进入上下文，添加额外的上下文信息"""
         self.original_logger = self.logger
         return self.logger.bind(**self.context)
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """退出上下文，恢复原始日志记录器"""
         # 上下文会自动清理，无需特殊处理
@@ -150,20 +151,20 @@ def log_function_call(logger: FilteringBoundLogger):
                 args=str(args)[:100],  # 限制长度避免日志过大
                 kwargs=str(kwargs)[:100]
             )
-            
+
             try:
                 # 执行函数
                 result = func(*args, **kwargs)
-                
+
                 # 记录成功
                 logger.info(
                     "function_completed",
                     function=func.__name__,
                     success=True
                 )
-                
+
                 return result
-                
+
             except Exception as e:
                 # 记录失败
                 logger.error(
@@ -173,7 +174,7 @@ def log_function_call(logger: FilteringBoundLogger):
                     exc_info=True
                 )
                 raise
-        
+
         return wrapper
     return decorator
 
@@ -194,20 +195,20 @@ def log_async_function_call(logger: FilteringBoundLogger):
                 args=str(args)[:100],
                 kwargs=str(kwargs)[:100]
             )
-            
+
             try:
                 # 执行异步函数
                 result = await func(*args, **kwargs)
-                
+
                 # 记录成功
                 logger.info(
                     "async_function_completed",
                     function=func.__name__,
                     success=True
                 )
-                
+
                 return result
-                
+
             except Exception as e:
                 # 记录失败
                 logger.error(
@@ -217,7 +218,7 @@ def log_async_function_call(logger: FilteringBoundLogger):
                     exc_info=True
                 )
                 raise
-        
+
         return wrapper
     return decorator
 
@@ -225,30 +226,30 @@ def log_async_function_call(logger: FilteringBoundLogger):
 # 预定义的日志事件类型
 class LogEvent:
     """标准化的日志事件类型"""
-    
+
     # 应用生命周期
     APP_STARTED = "app_started"
     APP_STOPPED = "app_stopped"
     APP_ERROR = "app_error"
-    
+
     # API请求
     REQUEST_RECEIVED = "request_received"
     REQUEST_COMPLETED = "request_completed"
     REQUEST_FAILED = "request_failed"
-    
+
     # 外部服务
     OPENAI_CALL = "openai_api_call"
     OPENAI_SUCCESS = "openai_api_success"
     OPENAI_ERROR = "openai_api_error"
-    
+
     MILVUS_OPERATION = "milvus_operation"
     MILVUS_SUCCESS = "milvus_success"
     MILVUS_ERROR = "milvus_error"
-    
+
     REDIS_OPERATION = "redis_operation"
     REDIS_SUCCESS = "redis_success"
     REDIS_ERROR = "redis_error"
-    
+
     # 业务逻辑
     DETECTION_STARTED = "detection_started"
     DETECTION_COMPLETED = "detection_completed"
@@ -266,11 +267,11 @@ class LogEvent:
     DOCUMENT_PROCESSING_STARTED = "document_processing_started"
     DOCUMENT_PROCESSING_COMPLETED = "document_processing_completed"
     DOCUMENT_PROCESSING_FAILED = "document_processing_failed"
-    
+
     # 性能指标
     PERFORMANCE_METRIC = "performance_metric"
     SLOW_OPERATION = "slow_operation"
-    
+
     # 安全事件
     SECURITY_WARNING = "security_warning"
     AUTHENTICATION_FAILED = "authentication_failed"

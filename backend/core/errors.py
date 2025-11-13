@@ -3,7 +3,8 @@
 遵循简单性原则：清晰的错误分类和有意义的错误消息
 """
 from enum import Enum
-from typing import Optional, Any, Dict
+from typing import Any
+
 from fastapi import HTTPException, status
 
 
@@ -34,12 +35,12 @@ class ErrorCode(str, Enum):
 
 class BaseApplicationError(Exception):
     """应用基础异常类"""
-    
+
     def __init__(
         self,
         message: str,
         error_code: ErrorCode = ErrorCode.INTERNAL_ERROR,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
         status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR
     ):
         self.message = message
@@ -47,8 +48,8 @@ class BaseApplicationError(Exception):
         self.details = details or {}
         self.status_code = status_code
         super().__init__(message)
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式"""
         return {
             "error_code": self.error_code.value,
@@ -60,7 +61,7 @@ class BaseApplicationError(Exception):
 # 客户端错误 (4xx)
 class InvalidRequestError(BaseApplicationError):
     """无效请求错误"""
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+    def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(
             message=message,
             error_code=ErrorCode.INVALID_REQUEST,
@@ -71,13 +72,13 @@ class InvalidRequestError(BaseApplicationError):
 
 class InvalidInputError(BaseApplicationError):
     """输入验证错误"""
-    def __init__(self, message: str, field: Optional[str] = None, value: Any = None):
+    def __init__(self, message: str, field: str | None = None, value: Any = None):
         details = {}
         if field:
             details["field"] = field
         if value is not None:
             details["value"] = str(value)
-        
+
         super().__init__(
             message=message,
             error_code=ErrorCode.INVALID_INPUT,
@@ -88,13 +89,13 @@ class InvalidInputError(BaseApplicationError):
 
 class ResourceNotFoundError(BaseApplicationError):
     """资源不存在错误"""
-    def __init__(self, resource_type: str, resource_id: Optional[str] = None):
+    def __init__(self, resource_type: str, resource_id: str | None = None):
         message = f"{resource_type} not found"
         details = {"resource_type": resource_type}
         if resource_id:
             details["resource_id"] = resource_id
             message = f"{resource_type} with id '{resource_id}' not found"
-        
+
         super().__init__(
             message=message,
             error_code=ErrorCode.RESOURCE_NOT_FOUND,
@@ -117,7 +118,7 @@ class DuplicateResourceError(BaseApplicationError):
 # 服务端错误 (5xx)
 class InternalServerError(BaseApplicationError):
     """内部服务器错误"""
-    def __init__(self, message: str = "An internal error occurred", details: Optional[Dict[str, Any]] = None):
+    def __init__(self, message: str = "An internal error occurred", details: dict[str, Any] | None = None):
         super().__init__(
             message=message,
             error_code=ErrorCode.INTERNAL_ERROR,
@@ -128,13 +129,13 @@ class InternalServerError(BaseApplicationError):
 
 class ServiceUnavailableError(BaseApplicationError):
     """服务不可用错误"""
-    def __init__(self, service_name: str, reason: Optional[str] = None):
+    def __init__(self, service_name: str, reason: str | None = None):
         message = f"{service_name} service is currently unavailable"
         details = {"service": service_name}
         if reason:
             message = f"{message}: {reason}"
             details["reason"] = reason
-        
+
         super().__init__(
             message=message,
             error_code=ErrorCode.SERVICE_UNAVAILABLE,
@@ -146,11 +147,11 @@ class ServiceUnavailableError(BaseApplicationError):
 # 外部服务错误
 class OpenAIError(BaseApplicationError):
     """OpenAI API错误"""
-    def __init__(self, message: str, api_error: Optional[Exception] = None):
+    def __init__(self, message: str, api_error: Exception | None = None):
         details = {}
         if api_error:
             details["original_error"] = str(api_error)
-        
+
         super().__init__(
             message=f"OpenAI API error: {message}",
             error_code=ErrorCode.OPENAI_ERROR,
@@ -161,13 +162,13 @@ class OpenAIError(BaseApplicationError):
 
 class MilvusError(BaseApplicationError):
     """Milvus数据库错误"""
-    def __init__(self, message: str, operation: Optional[str] = None, original_error: Optional[Exception] = None):
+    def __init__(self, message: str, operation: str | None = None, original_error: Exception | None = None):
         details = {}
         if operation:
             details["operation"] = operation
         if original_error:
             details["original_error"] = str(original_error)
-        
+
         super().__init__(
             message=f"Milvus error: {message}",
             error_code=ErrorCode.MILVUS_ERROR,
@@ -178,7 +179,7 @@ class MilvusError(BaseApplicationError):
 
 class RedisError(BaseApplicationError):
     """Redis缓存错误"""
-    def __init__(self, message: str, operation: Optional[str] = None):
+    def __init__(self, message: str, operation: str | None = None):
         details = {}
         if operation:
             details["operation"] = operation
@@ -193,7 +194,7 @@ class RedisError(BaseApplicationError):
 
 class LLMError(BaseApplicationError):
     """LLM服务错误"""
-    def __init__(self, message: str, model: Optional[str] = None, api_error: Optional[Exception] = None):
+    def __init__(self, message: str, model: str | None = None, api_error: Exception | None = None):
         details = {}
         if model:
             details["model"] = model
@@ -211,11 +212,11 @@ class LLMError(BaseApplicationError):
 # 业务逻辑错误
 class DetectionError(BaseApplicationError):
     """检测失败错误"""
-    def __init__(self, message: str, stage: Optional[str] = None):
+    def __init__(self, message: str, stage: str | None = None):
         details = {}
         if stage:
             details["stage"] = stage
-        
+
         super().__init__(
             message=f"Detection failed: {message}",
             error_code=ErrorCode.DETECTION_FAILED,
@@ -226,11 +227,11 @@ class DetectionError(BaseApplicationError):
 
 class EmbeddingError(BaseApplicationError):
     """嵌入生成错误"""
-    def __init__(self, message: str, text_length: Optional[int] = None):
+    def __init__(self, message: str, text_length: int | None = None):
         details = {}
         if text_length is not None:
             details["text_length"] = text_length
-        
+
         super().__init__(
             message=f"Embedding generation failed: {message}",
             error_code=ErrorCode.EMBEDDING_FAILED,
@@ -252,7 +253,7 @@ class StorageError(BaseApplicationError):
 
 class TextProcessingError(BaseApplicationError):
     """文本处理错误"""
-    def __init__(self, message: str, process_type: Optional[str] = None):
+    def __init__(self, message: str, process_type: str | None = None):
         details = {}
         if process_type:
             details["process_type"] = process_type
@@ -267,7 +268,7 @@ class TextProcessingError(BaseApplicationError):
 
 class DocumentParseError(BaseApplicationError):
     """文档解析错误"""
-    def __init__(self, message: str, file_path: Optional[str] = None, file_type: Optional[str] = None):
+    def __init__(self, message: str, file_path: str | None = None, file_type: str | None = None):
         details = {}
         if file_path:
             details["file_path"] = file_path

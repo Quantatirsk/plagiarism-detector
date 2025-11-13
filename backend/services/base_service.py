@@ -2,15 +2,16 @@
 基础服务类 - 所有服务的公共功能
 Following Linus principle: Keep it simple and practical
 """
-from typing import TypeVar, Type
-from backend.core.logging import get_logger
+from typing import TypeVar, cast
+
 from backend.core.config import get_settings
+from backend.core.logging import get_logger
 
 # Type variable for singleton decorator
 T = TypeVar('T')
 
 
-def singleton(cls: Type[T]) -> Type[T]:
+def singleton(cls: type[T]) -> type[T]:
     """
     单例装饰器 - 确保服务类只有一个实例
     Simple and practical implementation
@@ -36,7 +37,7 @@ def singleton(cls: Type[T]) -> Type[T]:
     SingletonWrapper.__module__ = cls.__module__
     SingletonWrapper.__doc__ = cls.__doc__
 
-    return SingletonWrapper  # type: ignore
+    return cast(type[T], SingletonWrapper)
 
 
 class BaseService:
@@ -65,6 +66,10 @@ class BaseService:
     def _initialize(self):
         """子类可以覆盖此方法进行特定初始化"""
         pass
+
+    def is_initialized(self) -> bool:
+        """检查服务是否已初始化 - 公开接口"""
+        return self._initialized
 
     def __repr__(self):
         """Simple representation for debugging"""

@@ -1,13 +1,13 @@
 """Storage gateway for document library and comparison workflow."""
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable, List, Optional, Sequence
 
 from sqlalchemy import delete, or_
 from sqlalchemy.exc import NoResultFound
-from sqlmodel import select, col
+from sqlmodel import col, select
 
 from backend.db import get_session
 from backend.db.models import (
@@ -26,7 +26,6 @@ from backend.db.models import (
 )
 from backend.services.base_service import BaseService, singleton
 
-
 # ---------------------------------------------------------------------------
 # Data payloads
 # ---------------------------------------------------------------------------
@@ -34,22 +33,22 @@ from backend.services.base_service import BaseService, singleton
 
 @dataclass(slots=True)
 class ProjectCreate:
-    name: Optional[str]
-    description: Optional[str]
+    name: str | None
+    description: str | None
 
 
 @dataclass(slots=True)
 class DocumentCreate:
     project_id: int
-    title: Optional[str]
-    filename: Optional[str]
-    source: Optional[str]
+    title: str | None
+    filename: str | None
+    source: str | None
     checksum: str
-    storage_path: Optional[str]
-    processed_text: Optional[str]
-    language: Optional[str]
+    storage_path: str | None
+    processed_text: str | None
+    language: str | None
     char_count: int
-    metadata: Optional[dict]
+    metadata: dict | None
 
 
 @dataclass(slots=True)
@@ -58,9 +57,9 @@ class ChunkCreate:
     chunk_index: int
     start_pos: int
     end_pos: int
-    parent_chunk_id: Optional[int]
+    parent_chunk_id: int | None
     text: str
-    text_hash: Optional[str] = None
+    text_hash: str | None = None
 
 
 @dataclass(slots=True)
@@ -69,14 +68,14 @@ class EmbeddingCreate:
     vector_id: str
     model: str
     dimension: int
-    norm: Optional[float]
+    norm: float | None
 
 
 @dataclass(slots=True)
 class CompareJobCreate:
     project_id: int
-    name: Optional[str]
-    config: Optional[dict]
+    name: str | None
+    config: dict | None
 
 
 @dataclass(slots=True)
@@ -91,26 +90,26 @@ class MatchGroupCreate:
     pair_id: int
     left_chunk_id: int
     right_chunk_id: int
-    final_score: Optional[float]
-    semantic_score: Optional[float]
-    cross_score: Optional[float]
-    alignment_ratio: Optional[float]
+    final_score: float | None
+    semantic_score: float | None
+    cross_score: float | None
+    alignment_ratio: float | None
     span_count: int
     match_count: int
-    paragraph_spans: Optional[dict]
-    document_spans: Optional[dict]
+    paragraph_spans: list[dict] | None
+    document_spans: list[dict] | None
 
 
 @dataclass(slots=True)
 class MatchDetailCreate:
     left_chunk_id: int
     right_chunk_id: int
-    final_score: Optional[float]
-    semantic_score: Optional[float]
-    cross_score: Optional[float]
-    spans: Optional[dict]
-    group_id: Optional[int] = None
-    group_key: Optional[tuple[int, int]] = None
+    final_score: float | None
+    semantic_score: float | None
+    cross_score: float | None
+    spans: list[dict] | None
+    group_id: int | None = None
+    group_key: tuple[int, int] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -132,13 +131,13 @@ class StorageGateway(BaseService):
             await session.flush()
             return project
 
-    async def list_projects(self) -> List[Project]:
+    async def list_projects(self) -> list[Project]:
         async with get_session() as session:
             stmt = select(Project).order_by(col(Project.created_at).desc())
             result = await session.exec(stmt)
             return list(result.all())
 
-    async def fetch_project(self, project_id: int) -> Optional[Project]:
+    async def fetch_project(self, project_id: int) -> Project | None:
         async with get_session() as session:
             return await session.get(Project, project_id)
 
@@ -166,9 +165,9 @@ class StorageGateway(BaseService):
         document_id: int,
         *,
         status: DocumentStatus,
-        paragraph_count: Optional[int] = None,
-        sentence_count: Optional[int] = None,
-        error_message: Optional[str] = None,
+        paragraph_count: int | None = None,
+        sentence_count: int | None = None,
+        error_message: str | None = None,
     ) -> Document:
         async with get_session() as session:
             document = await session.get(Document, document_id)
@@ -192,12 +191,12 @@ class StorageGateway(BaseService):
         self,
         document_id: int,
         *,
-        checksum: Optional[str] = None,
-        processed_text: Optional[str] = None,
-        language: Optional[str] = None,
-        char_count: Optional[int] = None,
-        filename: Optional[str] = None,
-        storage_path: Optional[str] = None,
+        checksum: str | None = None,
+        processed_text: str | None = None,
+        language: str | None = None,
+        char_count: int | None = None,
+        filename: str | None = None,
+        storage_path: str | None = None,
     ) -> Document:
         """Update document with parsed information."""
         async with get_session() as session:
@@ -228,9 +227,9 @@ class StorageGateway(BaseService):
         self,
         document_id: int,
         chunks: Sequence[ChunkCreate],
-    ) -> List[DocumentChunk]:
+    ) -> list[DocumentChunk]:
         async with get_session() as session:
-            stored: List[DocumentChunk] = []
+            stored: list[DocumentChunk] = []
             for entry in chunks:
                 chunk = DocumentChunk(
                     document_id=document_id,
@@ -293,9 +292,9 @@ class StorageGateway(BaseService):
             await session.flush()
             return job
 
-    async def add_pairs(self, pairs: Sequence[ComparePairCreate]) -> List[ComparePair]:
+    async def add_pairs(self, pairs: Sequence[ComparePairCreate]) -> list[ComparePair]:
         async with get_session() as session:
-            stored: List[ComparePair] = []
+            stored: list[ComparePair] = []
             for entry in pairs:
                 pair = ComparePair(
                     job_id=entry.job_id,
@@ -313,7 +312,7 @@ class StorageGateway(BaseService):
         pair_id: int,
         *,
         status: ComparePairStatus,
-        metrics: Optional[dict] = None,
+        metrics: dict | None = None,
     ) -> ComparePair:
         async with get_session() as session:
             pair = await session.get(ComparePair, pair_id)
@@ -333,9 +332,9 @@ class StorageGateway(BaseService):
     async def store_match_groups(
         self,
         groups: Sequence[MatchGroupCreate],
-    ) -> List[MatchGroup]:
+    ) -> list[MatchGroup]:
         async with get_session() as session:
-            stored: List[MatchGroup] = []
+            stored: list[MatchGroup] = []
             for entry in groups:
                 record = MatchGroup(
                     pair_id=entry.pair_id,
@@ -381,8 +380,8 @@ class StorageGateway(BaseService):
         self,
         document_id: int,
         *,
-        chunk_type: Optional[ChunkGranularity] = None,
-    ) -> List[DocumentChunk]:
+        chunk_type: ChunkGranularity | None = None,
+    ) -> list[DocumentChunk]:
         async with get_session() as session:
             stmt = select(DocumentChunk).where(DocumentChunk.document_id == document_id)
             if chunk_type is not None:
@@ -391,7 +390,7 @@ class StorageGateway(BaseService):
             result = await session.exec(stmt)
             return list(result.all())
 
-    async def fetch_pairs_for_job(self, job_id: int) -> List[ComparePair]:
+    async def fetch_pairs_for_job(self, job_id: int) -> list[ComparePair]:
         async with get_session() as session:
             stmt = select(ComparePair).where(ComparePair.job_id == job_id)
             result = await session.exec(stmt)
@@ -413,12 +412,12 @@ class StorageGateway(BaseService):
             groups = (await session.exec(stmt)).all()
 
             group_ids = [group.id for group in groups]
-            details: List[MatchDetail] = []
+            details: list[MatchDetail] = []
             if group_ids:
                 detail_stmt = select(MatchDetail).where(col(MatchDetail.group_id).in_(group_ids))
                 details = list((await session.exec(detail_stmt)).all())
 
-            detail_map = {}
+            detail_map: dict[int, list] = {}
             for detail in details:
                 detail_map.setdefault(detail.group_id, []).append(detail)
 
@@ -429,7 +428,7 @@ class StorageGateway(BaseService):
                 "groups": [
                     {
                         "group": group,
-                        "details": detail_map.get(group.id, []),
+                        "details": detail_map.get(group.id or 0, []),
                     }
                     for group in groups
                 ],
@@ -505,10 +504,10 @@ class StorageGateway(BaseService):
             await session.execute(delete(CompareJob).where(col(CompareJob.id) == job_id))
             await session.commit()
 
-    async def fetch_compare_job(self, job_id: int) -> Optional[CompareJob]:
+    async def fetch_compare_job(self, job_id: int) -> CompareJob | None:
         async with get_session() as session:
             return await session.get(CompareJob, job_id)
 
-    async def fetch_pair(self, pair_id: int) -> Optional[ComparePair]:
+    async def fetch_pair(self, pair_id: int) -> ComparePair | None:
         async with get_session() as session:
             return await session.get(ComparePair, pair_id)

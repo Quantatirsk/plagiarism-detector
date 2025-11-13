@@ -1,8 +1,9 @@
 """
 报告模板服务 - 管理报告生成的提示词模板和配置
 """
-from typing import Dict, Any, List
-from backend.models.report_models import ReportType, ReportTemplate
+from typing import Any
+
+from backend.models.report_models import ReportTemplate, ReportType
 from backend.services.base_service import BaseService, singleton
 
 
@@ -12,7 +13,7 @@ class ReportTemplateService(BaseService):
 
     def _initialize(self):
         """初始化模板数据"""
-        self.templates: Dict[str, ReportTemplate] = {}
+        self.templates: dict[str, ReportTemplate] = {}
         self._load_templates()
 
     def _load_templates(self):
@@ -290,7 +291,7 @@ Output Requirements:
 
         return template
 
-    def format_user_prompt(self, template: ReportTemplate, data: Dict[str, Any]) -> str:
+    def format_user_prompt(self, template: ReportTemplate, data: dict[str, Any]) -> str:
         """格式化用户提示词"""
         try:
             return template.user_prompt_template.format(**data)
@@ -298,19 +299,19 @@ Output Requirements:
             self.logger.error(f"Missing template variable: {e}")
             raise ValueError(f"Template formatting failed, missing variable: {e}")
 
-    def get_available_templates(self) -> List[Dict[str, str]]:
+    def get_available_templates(self) -> list[dict[str, str]]:
         """获取可用模板列表"""
         self._ensure_initialized()  # 确保初始化
         return [
             {
                 "type": template.type.value,
                 "language": template.language,
-                "sections_count": len(template.sections)
+                "sections_count": str(len(template.sections))
             }
             for template in self.templates.values()
         ]
 
-    def validate_template_data(self, template: ReportTemplate, data: Dict[str, Any]) -> bool:
+    def validate_template_data(self, template: ReportTemplate, data: dict[str, Any]) -> bool:
         """验证模板数据的完整性"""
         import re
 
@@ -324,7 +325,7 @@ Output Requirements:
 
         return True
 
-    def get_chart_configs(self, report_type: ReportType, language: str = "zh") -> Dict[str, Any]:
+    def get_chart_configs(self, report_type: ReportType, language: str = "zh") -> dict[str, Any]:
         """获取图表配置"""
         template = self.get_template(report_type, language)
         return template.chart_configs
@@ -333,8 +334,8 @@ Output Requirements:
         self,
         report_type: ReportType,
         language: str,
-        custom_sections: List[str] = None,
-        custom_prompts: Dict[str, str] = None
+        custom_sections: list[str] | None = None,
+        custom_prompts: dict[str, str] | None = None
     ) -> ReportTemplate:
         """自定义报告模板"""
         base_template = self.get_template(report_type, language)

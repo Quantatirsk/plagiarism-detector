@@ -1,20 +1,21 @@
 """Metrics API for monitoring pipeline performance."""
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from typing import Any
 
-from backend.services.pipeline_metrics import metrics_collector
+from fastapi import APIRouter
+from pydantic import BaseModel
+
 from backend.services.cross_encoder_service import CrossEncoderService
 from backend.services.minhash_filter import MinHashFilterStage
+from backend.services.pipeline_metrics import metrics_collector
 
 router = APIRouter(prefix="/api/v1/metrics", tags=["Metrics"])
 
 
 class MetricsResponse(BaseModel):
     """Response model for metrics endpoint."""
-    pipeline_metrics: Optional[Dict[str, Any]]
-    cross_encoder_stats: Optional[Dict[str, Any]]
-    minhash_stats: Optional[Dict[str, Any]]
+    pipeline_metrics: dict[str, Any] | None
+    cross_encoder_stats: dict[str, Any] | None
+    minhash_stats: dict[str, Any] | None
 
 
 @router.get("", response_model=MetricsResponse, summary="Get pipeline metrics")

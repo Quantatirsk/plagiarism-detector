@@ -3,14 +3,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-from typing import Dict, List, Optional, Sequence, Tuple, Union
 from collections import OrderedDict
+from collections.abc import Sequence
 from time import time
+from typing import Any
 
 from backend.services.base_service import BaseService, singleton
 
-
-PairText = Tuple[str, str]
+PairText = tuple[str, str]
 
 
 @singleton
@@ -22,6 +22,10 @@ class CrossEncoderService(BaseService):
     CACHE_TTL = 3600    # Time-to-live in seconds (1 hour)
 
     def _initialize(self) -> None:
+        from backend.services.jina_reranker import JinaRerankFunction
+        from backend.services.openai_reranker import OpenAIRerankFunction
+
+        self._reranker: JinaRerankFunction | OpenAIRerankFunction
         self.provider = self.settings.reranker_provider.lower()
 
         if self.provider == "jina":
@@ -34,7 +38,6 @@ class CrossEncoderService(BaseService):
 
             try:
                 # Use custom JinaRerankFunction that fixes pymilvus parsing bug
-                from backend.services.jina_reranker import JinaRerankFunction
                 self._reranker = JinaRerankFunction(
                     model_name=self.model,
                     api_key=self.api_key,
@@ -56,7 +59,6 @@ class CrossEncoderService(BaseService):
                 raise ValueError("Base URL is required for OpenAI reranker service")
 
             try:
-                from backend.services.openai_reranker import OpenAIRerankFunction
                 self._reranker = OpenAIRerankFunction(
                     model_name=self.model,
                     api_key=self.api_key,
@@ -71,11 +73,11 @@ class CrossEncoderService(BaseService):
             raise ValueError(f"Unknown reranker provider: {self.provider}. Supported: 'jina', 'openai'")
 
         # Initialize LRU cache with TTL
-        self._cache: OrderedDict[str, Tuple[float, float]] = OrderedDict()  # key -> (score, timestamp)
+        self._cache: OrderedDict[str, tuple[float, float]] = OrderedDict()  # key -> (score, timestamp)
         self._cache_hits = 0
         self._cache_misses = 0
 
-    async def score_pairs(self, pairs: Sequence[PairText]) -> List[float]:
+    async def score_pairs(self, pairs: Sequence[PairText]) -> list[float]:
         if not pairs:
             return []
         self._ensure_initialized()
@@ -85,8 +87,8 @@ class CrossEncoderService(BaseService):
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _score_pairs_sync(self, pairs: Sequence[PairText]) -> List[float]:
-        scores: List[float] = []
+    def _score_pairs_sync(self, pairs: Sequence[PairText]) -> list[float]:
+        scores: list[float] = []
         for left, right in pairs:
             scores.append(self._score_pair_sync(left, right))
         return scores
@@ -135,7 +137,7 @@ class CrossEncoderService(BaseService):
         combined = f"{self.provider}\x00{self.model}\x00{left}\x00{right}"
         return hashlib.sha256(combined.encode('utf-8')).hexdigest()
 
-    def _get_from_cache(self, key: str) -> Optional[float]:
+    def _get_from_cache(self, key: str) -> float | None:
         """Get score from cache if exists and not expired."""
         if key in self._cache:
             score, timestamp = self._cache[key]
@@ -164,7 +166,7 @@ class CrossEncoderService(BaseService):
         # Add new entry
         self._cache[key] = (score, current_time)
 
-    def get_cache_stats(self) -> Dict[str, any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics for monitoring."""
         total_requests = self._cache_hits + self._cache_misses
         hit_rate = self._cache_hits / total_requests if total_requests > 0 else 0.0

@@ -1,5 +1,7 @@
 import type { DocumentStatus } from '@/api/plagiarismApi';
-import type { StatusBadgeTone } from '@/components/ui/status-badge';
+
+// Status tone for Ant Design Tag colors
+export type StatusBadgeTone = 'info' | 'warning' | 'success' | 'error' | 'neutral';
 
 export interface StatusMeta {
   label: string;

@@ -1,13 +1,11 @@
 """Progress tracking API endpoints."""
 from __future__ import annotations
 
-from typing import List, Optional
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from backend.core.logging import get_logger
-from backend.services.progress_tracker import ProgressTracker, ProgressType, ProgressStatus
+from backend.services.progress_tracker import ProgressStatus, ProgressTracker, ProgressType
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/progress", tags=["Progress"])
@@ -23,20 +21,20 @@ class ProgressTaskResponse(BaseModel):
     task_type: ProgressType
     description: str
     status: ProgressStatus
-    total_steps: Optional[int]
+    total_steps: int | None
     current_step: int
     progress_percent: float
-    parent_id: Optional[str]
+    parent_id: str | None
     metadata: dict
-    created_at: Optional[str]
-    started_at: Optional[str]
-    completed_at: Optional[str]
-    error_message: Optional[str]
-    current_message: Optional[str]
-    sub_tasks: List[str]
-    duration_seconds: Optional[float]
-    items_per_second: Optional[float]
-    estimated_seconds_remaining: Optional[float]
+    created_at: str | None
+    started_at: str | None
+    completed_at: str | None
+    error_message: str | None
+    current_message: str | None
+    sub_tasks: list[str]
+    duration_seconds: float | None
+    items_per_second: float | None
+    estimated_seconds_remaining: float | None
 
 
 @router.get("/tasks/{task_id}", response_model=ProgressTaskResponse)
@@ -51,30 +49,30 @@ async def get_task(
     return ProgressTaskResponse(**task)
 
 
-@router.get("/tasks/{task_id}/subtasks", response_model=List[ProgressTaskResponse])
+@router.get("/tasks/{task_id}/subtasks", response_model=list[ProgressTaskResponse])
 async def get_subtasks(
     task_id: str,
     tracker: ProgressTracker = Depends(_progress_tracker)
-) -> List[ProgressTaskResponse]:
+) -> list[ProgressTaskResponse]:
     """Get all subtasks of a parent task."""
     subtasks = tracker.get_tasks_by_parent(task_id)
     return [ProgressTaskResponse(**task) for task in subtasks]
 
 
-@router.get("/active", response_model=List[ProgressTaskResponse])
+@router.get("/active", response_model=list[ProgressTaskResponse])
 async def get_active_tasks(
     tracker: ProgressTracker = Depends(_progress_tracker)
-) -> List[ProgressTaskResponse]:
+) -> list[ProgressTaskResponse]:
     """Get all currently active (running) tasks."""
     tasks = tracker.get_active_tasks()
     return [ProgressTaskResponse(**task) for task in tasks]
 
 
-@router.get("/recent", response_model=List[ProgressTaskResponse])
+@router.get("/recent", response_model=list[ProgressTaskResponse])
 async def get_recent_tasks(
     limit: int = Query(default=50, ge=1, le=200, description="Maximum number of tasks to return"),
     tracker: ProgressTracker = Depends(_progress_tracker)
-) -> List[ProgressTaskResponse]:
+) -> list[ProgressTaskResponse]:
     """Get recent tasks sorted by creation time."""
     tasks = tracker.get_recent_tasks(limit=limit)
     return [ProgressTaskResponse(**task) for task in tasks]
@@ -110,7 +108,7 @@ async def cleanup_old_tasks(
 # SSE endpoint for real-time progress updates
 @router.get("/stream")
 async def stream_progress(
-    task_id: Optional[str] = Query(None, description="Specific task ID to monitor, or all tasks if not provided"),
+    task_id: str | None = Query(None, description="Specific task ID to monitor, or all tasks if not provided"),
     tracker: ProgressTracker = Depends(_progress_tracker)
 ):
     """
@@ -120,9 +118,10 @@ async def stream_progress(
     If task_id is provided, only updates for that task will be sent.
     Otherwise, all task updates will be streamed.
     """
-    from fastapi.responses import StreamingResponse
     import asyncio
     import json
+
+    from fastapi.responses import StreamingResponse
 
     async def event_generator():
         # Subscribe to updates
@@ -145,7 +144,7 @@ async def stream_progress(
                     # Wait for update with timeout
                     update = await asyncio.wait_for(queue.get(), timeout=30.0)
                     yield f"data: {json.dumps(update)}\n\n"
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Send heartbeat
                     yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
                 except asyncio.CancelledError:

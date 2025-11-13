@@ -16,8 +16,6 @@ import logging
 
 # 配置日志记录器
 logger = logging.getLogger(__name__)
-
-
 class EnhancedTextParser(BaseParser):
     """
     Enhanced parser for all text-based file formats.

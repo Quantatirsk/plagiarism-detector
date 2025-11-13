@@ -1,20 +1,26 @@
 """
 报告数据处理服务 - 处理和聚合抄袭检测数据为报告生成做准备
 """
-from typing import List, Dict, Any, Optional
-from collections import defaultdict
 import statistics
+from collections import defaultdict
+from typing import Any
 
-from backend.models.report_models import (
-    DocumentReportData, ComparisonReportData, ProjectReportData,
-    SimilaritySource, MatchDetail, ProjectStatistics, RiskLevel
-)
-from backend.api.v1.compare import PairReportResponse, MatchGroup, MatchDetailModel, PairResponse
-from backend.db.models import Document, Project, ComparePair, CompareJob, DocumentChunk
-from backend.services.base_service import BaseService, singleton
-from backend.db import get_session
-from sqlmodel import select, col
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+from backend.api.v1.compare import MatchDetailModel, MatchGroup, PairReportResponse, PairResponse
+from backend.db import get_session
+from backend.db.models import CompareJob, ComparePair, Document, DocumentChunk, Project
+from backend.models.report_models import (
+    ComparisonReportData,
+    DocumentReportData,
+    MatchDetail,
+    ProjectReportData,
+    ProjectStatistics,
+    RiskLevel,
+    SimilaritySource,
+)
+from backend.services.base_service import BaseService, singleton
 from backend.services.service_factory import ServiceFactory
 
 
@@ -176,12 +182,12 @@ class ReportDataProcessor(BaseService):
 
     def _aggregate_similarity_sources(
         self,
-        pair_reports: List[PairReportResponse],
+        pair_reports: list[PairReportResponse],
         target_document_id: str | int
-    ) -> List[SimilaritySource]:
+    ) -> list[SimilaritySource]:
         """聚合相似度来源"""
         target_id = self._parse_int_id(target_document_id, "document")
-        source_map: Dict[int, Dict[str, Any]] = defaultdict(lambda: {
+        source_map: dict[int, dict[str, Any]] = defaultdict(lambda: {
             'similarity_scores': [],
             'match_count': 0,
             'total_length': 0
@@ -223,7 +229,7 @@ class ReportDataProcessor(BaseService):
         sources.sort(key=lambda x: x.similarity_score, reverse=True)
         return sources
 
-    def _calculate_total_similarity(self, sources: List[SimilaritySource]) -> float:
+    def _calculate_total_similarity(self, sources: list[SimilaritySource]) -> float:
         """计算总体相似度"""
         if not sources:
             return 0.0
@@ -241,9 +247,9 @@ class ReportDataProcessor(BaseService):
 
     def _extract_top_matches(
         self,
-        pair_reports: List[PairReportResponse],
+        pair_reports: list[PairReportResponse],
         max_matches: int
-    ) -> List[MatchDetail]:
+    ) -> list[MatchDetail]:
         """提取高匹配详情"""
         all_matches = []
 
@@ -257,9 +263,9 @@ class ReportDataProcessor(BaseService):
 
     def _calculate_document_statistics(
         self,
-        pair_reports: List[PairReportResponse],
-        sources: List[SimilaritySource]
-    ) -> Dict[str, Any]:
+        pair_reports: list[PairReportResponse],
+        sources: list[SimilaritySource]
+    ) -> dict[str, Any]:
         """计算文档统计信息"""
         similarities = [source.similarity_score for source in sources]
 
@@ -276,8 +282,8 @@ class ReportDataProcessor(BaseService):
 
     def _calculate_project_statistics(
         self,
-        documents: List[Document],
-        comparisons: List[PairReportResponse]
+        documents: list[Document],
+        comparisons: list[PairReportResponse]
     ) -> ProjectStatistics:
         """计算项目统计信息"""
         if not comparisons:
@@ -317,7 +323,7 @@ class ReportDataProcessor(BaseService):
             most_similar_pairs=most_similar_pairs
         )
 
-    def _create_distribution(self, values: List[float], bins: int = 10) -> Dict[str, int]:
+    def _create_distribution(self, values: list[float], bins: int = 10) -> dict[str, int]:
         """创建数值分布"""
         if not values:
             return {}
@@ -357,19 +363,19 @@ class ReportDataProcessor(BaseService):
         except (TypeError, ValueError) as exc:
             raise ValueError(f"Invalid {entity} id: {value}") from exc
 
-    async def _get_document(self, session: AsyncSession, document_id: str | int) -> Optional[Document]:
+    async def _get_document(self, session: AsyncSession, document_id: str | int) -> Document | None:
         """获取文档"""
         doc_id = self._parse_int_id(document_id, "document")
         result = await session.exec(select(Document).where(Document.id == doc_id))
         return result.first()
 
-    async def _get_project(self, session: AsyncSession, project_id: str | int) -> Optional[Project]:
+    async def _get_project(self, session: AsyncSession, project_id: str | int) -> Project | None:
         """获取项目"""
         proj_id = self._parse_int_id(project_id, "project")
         result = await session.exec(select(Project).where(Project.id == proj_id))
         return result.first()
 
-    async def _get_document_comparisons(self, session: AsyncSession, document_id: str | int) -> List[PairReportResponse]:
+    async def _get_document_comparisons(self, session: AsyncSession, document_id: str | int) -> list[PairReportResponse]:
         """获取文档的所有比较结果"""
         doc_id = self._parse_int_id(document_id, "document")
 
@@ -381,7 +387,7 @@ class ReportDataProcessor(BaseService):
         result = await session.exec(stmt)
         pairs = result.all()
 
-        reports: List[PairReportResponse] = []
+        reports: list[PairReportResponse] = []
         for pair in pairs:
             try:
                 report = await self._build_pair_report_response(session, pair)
@@ -408,7 +414,7 @@ class ReportDataProcessor(BaseService):
             detail.right_chunk_id for detail in report.details if detail.right_chunk_id is not None
         }
 
-        chunk_text_map: Dict[int, str] = {}
+        chunk_text_map: dict[int, str] = {}
         if chunk_ids:
             result = await session.exec(select(DocumentChunk).where(col(DocumentChunk.id).in_(list(chunk_ids))))
             chunk_text_map = {chunk.id: chunk.text for chunk in result.all() if chunk.id is not None}
@@ -445,7 +451,7 @@ class ReportDataProcessor(BaseService):
             for group in report.groups
         ]
 
-        def build_excerpt(chunk_id: Optional[int]) -> Optional[str]:
+        def build_excerpt(chunk_id: int | None) -> str | None:
             if chunk_id is None:
                 return None
             text = chunk_text_map.get(chunk_id)
@@ -484,7 +490,7 @@ class ReportDataProcessor(BaseService):
         session: AsyncSession,
         doc_a_id: str | int,
         doc_b_id: str | int
-    ) -> Optional[PairReportResponse]:
+    ) -> PairReportResponse | None:
         """获取特定文档对的比较结果"""
         left_id = self._parse_int_id(doc_a_id, "document")
         right_id = self._parse_int_id(doc_b_id, "document")
@@ -511,13 +517,13 @@ class ReportDataProcessor(BaseService):
             )
             return None
 
-    async def _get_project_documents(self, session: AsyncSession, project_id: str | int) -> List[Document]:
+    async def _get_project_documents(self, session: AsyncSession, project_id: str | int) -> list[Document]:
         """获取项目内所有文档"""
         proj_id = self._parse_int_id(project_id, "project")
         result = await session.exec(select(Document).where(Document.project_id == proj_id))
         return list(result.all())
 
-    async def _get_project_comparisons(self, session: AsyncSession, project_id: str | int) -> List[PairReportResponse]:
+    async def _get_project_comparisons(self, session: AsyncSession, project_id: str | int) -> list[PairReportResponse]:
         """获取项目内所有比较结果"""
         proj_id = self._parse_int_id(project_id, "project")
 
@@ -530,7 +536,7 @@ class ReportDataProcessor(BaseService):
         result = await session.exec(stmt)
         pairs = result.all()
 
-        reports: List[PairReportResponse] = []
+        reports: list[PairReportResponse] = []
         for pair in pairs:
             try:
                 report = await self._build_pair_report_response(session, pair)
@@ -541,7 +547,7 @@ class ReportDataProcessor(BaseService):
 
         return reports
 
-    def _excerpt_text(self, text: Optional[str], max_length: Optional[int] = None) -> Optional[str]:
+    def _excerpt_text(self, text: str | None, max_length: int | None = None) -> str | None:
         """提取文本摘录，默认不截断以显示完整段落"""
         if not text:
             return None
@@ -550,14 +556,14 @@ class ReportDataProcessor(BaseService):
             return clean
         return clean[:max_length].rstrip() + "..."
 
-    def _group_details_by_group(self, report: PairReportResponse) -> Dict[int, List[MatchDetailModel]]:
+    def _group_details_by_group(self, report: PairReportResponse) -> dict[int, list[MatchDetailModel]]:
         """按匹配组聚合详情数据"""
-        detail_map: Dict[int, List[MatchDetailModel]] = defaultdict(list)
+        detail_map: dict[int, list[MatchDetailModel]] = defaultdict(list)
         for detail in report.details:
             detail_map[detail.group_id].append(detail)
         return detail_map
 
-    def _detail_similarity(self, detail: Optional[MatchDetailModel]) -> float:
+    def _detail_similarity(self, detail: MatchDetailModel | None) -> float:
         """提取匹配详情的相似度分数"""
         if detail is None:
             return 0.0
@@ -609,7 +615,7 @@ class ReportDataProcessor(BaseService):
     def _generate_side_by_side_data(
         self,
         pair_report: PairReportResponse
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """生成并排对比数据"""
         sections = []
         detail_map = self._group_details_by_group(pair_report)
@@ -641,9 +647,9 @@ class ReportDataProcessor(BaseService):
 
     async def _identify_high_risk_documents(
         self,
-        documents: List[Document],
-        comparisons: List[PairReportResponse]
-    ) -> List[DocumentReportData]:
+        documents: list[Document],
+        comparisons: list[PairReportResponse]
+    ) -> list[DocumentReportData]:
         """识别高风险文档"""
         high_risk_docs = []
 
@@ -666,9 +672,9 @@ class ReportDataProcessor(BaseService):
 
     def _generate_similarity_network(
         self,
-        documents: List[Document],
-        comparisons: List[PairReportResponse]
-    ) -> Dict[str, Any]:
+        documents: list[Document],
+        comparisons: list[PairReportResponse]
+    ) -> dict[str, Any]:
         """生成相似度网络图数据"""
         nodes = [
             {'id': doc.id, 'label': doc.title, 'size': 1}
@@ -699,10 +705,10 @@ class ReportDataProcessor(BaseService):
 
     def _detect_anomalies(
         self,
-        comparisons: List[PairReportResponse]
-    ) -> List[Dict[str, Any]]:
+        comparisons: list[PairReportResponse]
+    ) -> list[dict[str, Any]]:
         """检测异常高相似度"""
-        anomalies = []
+        anomalies: list[dict[str, Any]] = []
 
         if not comparisons:
             return anomalies
@@ -724,8 +730,8 @@ class ReportDataProcessor(BaseService):
     def _generate_project_recommendations(
         self,
         statistics: ProjectStatistics,
-        anomalies: List[Dict[str, Any]]
-    ) -> List[str]:
+        anomalies: list[dict[str, Any]]
+    ) -> list[str]:
         """生成项目建议"""
         recommendations = []
 

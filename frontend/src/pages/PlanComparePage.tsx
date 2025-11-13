@@ -1,4 +1,21 @@
+/**
+ * PlanComparePage - 文档对比页
+ *
+ * 功能：
+ * - 并排查看两个文档
+ * - 高亮显示匹配片段
+ * - 交互式匹配选择和跳转
+ * - 导出对比报告
+ */
+
 import { useCallback, useEffect, useMemo, useState, memo } from 'react';
+import { Card, Button, Select, Space, Typography, Spin, Row, Col } from 'antd';
+import {
+  ArrowLeftOutlined,
+  DownloadOutlined,
+  LeftOutlined,
+  RightOutlined,
+} from '@ant-design/icons';
 import type {
   DocumentDetail,
   DocumentSummary,
@@ -7,18 +24,16 @@ import type {
   PairReport,
   ComparePairSummary,
 } from '@/api/plagiarismApi';
-import { Button } from '@/components/ui/button';
-import { PageShell, PageHeader } from '@/components/layout/Page';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import PageLayout from '@/layout/PageLayout';
 import { MatchInfoTooltip, type MatchData } from '@/components/ui/match-info-popover';
-import { cn } from '@/lib/utils';
 import { buildSegmentsWithOverlap, type HighlightInterval as ImportedHighlightInterval } from '@/utils/highlightUtilsSimple';
-import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { saveAs } from 'file-saver';
+import { designSystem } from '@/styles/DesignSystem';
+
+const { Text } = Typography;
 
 type Side = 'left' | 'right';
 type DocumentLookup = Record<number, DocumentSummary>;
-
 
 interface PairComparePageProps {
   report: PairReport | null;
@@ -40,8 +55,6 @@ type NormalisedMatch = {
 };
 
 type HighlightMode = 'block' | 'fragment';
-
-// Use the imported type and extend it for compatibility
 type HighlightInterval = ImportedHighlightInterval;
 
 type Segment = {
@@ -56,7 +69,7 @@ type Segment = {
   }>;
 };
 
-export function PlanComparePage({
+export default function PlanComparePage({
   report,
   leftDocument,
   rightDocument,
@@ -68,6 +81,12 @@ export function PlanComparePage({
   onBack,
   isTransitioning = false,
 }: PairComparePageProps) {
+  // ==================== 状态管理 ====================
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(true);
+
+  // ==================== 数据处理 ====================
   const matches = useMemo<NormalisedMatch[]>(() => {
     if (!report) return [];
     const detailByGroup = report.details.reduce<Record<number, MatchDetailModel[]>>((acc, detail) => {
@@ -75,13 +94,18 @@ export function PlanComparePage({
       acc[detail.group_id].push(detail);
       return acc;
     }, {});
-    // Use group.id as the primary key for consistent matching across sides
     return report.groups.map((group) => ({
       key: `group-${group.id}`,
       group,
       details: detailByGroup[group.id] || [],
     }));
   }, [report]);
+
+  useEffect(() => {
+    if (matches.length > 0 && !activeKey) {
+      setActiveKey(matches[0].key);
+    }
+  }, [matches, activeKey]);
 
   const currentPairId = report?.pair.id;
   const pairOptions = useMemo(
@@ -94,40 +118,40 @@ export function PlanComparePage({
     [pairOptions, currentPairId, report],
   );
 
-  const [activeKey, setActiveKey] = useState<string | null>(matches[0]?.key ?? null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const leftIntervals = useMemo(
+    () => prepareIntervals(leftDocument?.processed_text ?? '', matches, 'left'),
+    [leftDocument?.processed_text, matches]
+  );
+  const rightIntervals = useMemo(
+    () => prepareIntervals(rightDocument?.processed_text ?? '', matches, 'right'),
+    [rightDocument?.processed_text, matches]
+  );
 
-  const leftIntervals = useMemo(() => prepareIntervals(leftDocument?.processed_text ?? '', matches, 'left'), [leftDocument?.processed_text, matches]);
-  const rightIntervals = useMemo(() => prepareIntervals(rightDocument?.processed_text ?? '', matches, 'right'), [rightDocument?.processed_text, matches]);
+  const leftSegments = useMemo(
+    () => buildSegmentsWithOverlap(leftDocument?.processed_text ?? '', leftIntervals),
+    [leftDocument?.processed_text, leftIntervals]
+  );
+  const rightSegments = useMemo(
+    () => buildSegmentsWithOverlap(rightDocument?.processed_text ?? '', rightIntervals),
+    [rightDocument?.processed_text, rightIntervals]
+  );
 
-  const leftSegments = useMemo(() => buildSegmentsWithOverlap(leftDocument?.processed_text ?? '', leftIntervals), [leftDocument?.processed_text, leftIntervals]);
-  const rightSegments = useMemo(() => buildSegmentsWithOverlap(rightDocument?.processed_text ?? '', rightIntervals), [rightDocument?.processed_text, rightIntervals]);
-
+  // ==================== 交互函数 ====================
   const jumpToMatch = useCallback((target: Side, matchKey: string, shouldFocus: boolean = false) => {
-    if (!matchKey) {
-      return;
-    }
-    // 修复选择器以支持新的 data-match-keys 属性
+    if (!matchKey) return;
     const targetNode = document.querySelector<HTMLElement>(`mark[data-side="${target}"][data-match-keys*="${matchKey}"]`);
     if (targetNode) {
-      // Find the scrollable container for the document pane
-      const scrollContainer = targetNode.closest('.overflow-auto');
+      const scrollContainer = targetNode.closest('[data-document-pane]');
       if (scrollContainer) {
-        // Calculate the position relative to the scroll container
         const containerRect = scrollContainer.getBoundingClientRect();
         const targetRect = targetNode.getBoundingClientRect();
         const relativeTop = targetRect.top - containerRect.top + scrollContainer.scrollTop;
-
-        // Center the element in the container
         const scrollPosition = relativeTop - (scrollContainer.clientHeight / 2) + (targetRect.height / 2);
-
-        // Scroll only within the container, not the entire page
         scrollContainer.scrollTo({
           top: Math.max(0, scrollPosition),
           behavior: 'smooth'
         });
       }
-
       if (shouldFocus) {
         targetNode.focus({ preventScroll: true });
       }
@@ -136,22 +160,16 @@ export function PlanComparePage({
 
   const handleSelectMatch = useCallback(
     (matchKey: string, source: Side) => {
-      if (!matchKey) {
-        return;
-      }
+      if (!matchKey) return;
 
-      // Remove active class from all elements
       document.querySelectorAll('mark.active-match').forEach(el => {
         el.classList.remove('active-match');
       });
 
-      // Add active class to matching elements on both sides
-      // Only highlight fragments, not the whole block
       document.querySelectorAll(`mark[data-match-key="${matchKey}"][data-mode="fragment"]`).forEach(el => {
         el.classList.add('active-match');
       });
 
-      // If no fragments, highlight the block
       if (document.querySelectorAll(`mark[data-match-key="${matchKey}"][data-mode="fragment"]`).length === 0) {
         document.querySelectorAll(`mark[data-match-key="${matchKey}"][data-mode="block"]`).forEach(el => {
           el.classList.add('active-match');
@@ -159,24 +177,18 @@ export function PlanComparePage({
       }
 
       setActiveKey(matchKey);
-
-      // Jump to both sides immediately
       jumpToMatch(source, matchKey, false);
       const opposite: Side = source === 'left' ? 'right' : 'left';
       jumpToMatch(opposite, matchKey, false);
 
       const matchButton = document.querySelector(`button[data-match-key="${matchKey}"]`);
       if (matchButton) {
-        // Find the scrollable container for the match list
-        const matchListContainer = matchButton.closest('.overflow-auto');
+        const matchListContainer = matchButton.closest('[data-match-list]');
         if (matchListContainer) {
           const containerRect = matchListContainer.getBoundingClientRect();
           const buttonRect = matchButton.getBoundingClientRect();
           const relativeTop = buttonRect.top - containerRect.top + matchListContainer.scrollTop;
-
-          // Center the button in the container
           const scrollPosition = relativeTop - (matchListContainer.clientHeight / 2) + (buttonRect.height / 2);
-
           matchListContainer.scrollTo({
             top: Math.max(0, scrollPosition),
             behavior: 'smooth'
@@ -188,10 +200,7 @@ export function PlanComparePage({
   );
 
   const handleDownloadComparison = useCallback(() => {
-    if (!report) {
-      return;
-    }
-
+    if (!report) return;
     const markdown = generateComparisonMarkdown({
       report,
       matches,
@@ -200,178 +209,339 @@ export function PlanComparePage({
       leftDocument,
       rightDocument,
     });
-
     const filename = `comparison-${report.pair.id}.md`;
     const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
     saveAs(blob, filename);
   }, [report, matches, currentPair, documentLookup, leftDocument, rightDocument]);
 
+  // ==================== 加载状态 ====================
   if (!report) {
     return (
-      <PageShell>
-        <div className="flex h-full items-center justify-center bg-muted/40 text-sm text-muted-foreground">
-          <div className="animate-pulse">正在加载配对报告...</div>
-        </div>
-      </PageShell>
+      <div style={{
+        display: 'flex',
+        height: '100vh',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: designSystem.semantic.surface.base,
+      }}>
+        <Spin tip="正在加载配对报告..." />
+      </div>
     );
   }
 
-  return (
-    <PageShell>
-      <PageHeader
-        title={
-          <>
-            <Button
-              variant="default"
-              size="sm"
-              className="text-xs h-7"
-              onClick={onBack}
-            >
-              ← 返回任务
-            </Button>
-            <div className="border-l border-border pl-3">
-              <div className="text-sm font-semibold">
-                {formatDocumentLabel(report.pair.left_document_id, documentLookup, leftDocument)} ↔{' '}
-                {formatDocumentLabel(report.pair.right_document_id, documentLookup, rightDocument)}
-              </div>
-              <div className="text-[11px] text-muted-foreground flex items-center gap-2">
-                <span className="inline-flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
-                  匹配数量：{matches.length}
-                </span>
-              </div>
-            </div>
-          </>
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs h-7"
-              onClick={handleDownloadComparison}
-              disabled={!report}
-            >
-              <Download className="mr-1.5 h-3.5 w-3.5" /> 下载对比结果
-            </Button>
-            <PairSwitcher
-              pairs={pairOptions}
-              currentPair={currentPair}
-              loading={pairsLoading}
-              error={pairsError}
-              documentLookup={documentLookup}
-              currentLeftDocument={leftDocument}
-              currentRightDocument={rightDocument}
-              onSwitchPair={onSwitchPair}
-            />
-          </div>
-        }
-      />
+  // ==================== 布局区域 ====================
 
-      <div className="relative flex flex-1 min-h-0 divide-x divide-border bg-background">
-        {isTransitioning && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <div className="animate-pulse text-sm text-muted-foreground">正在切换文档...</div>
-          </div>
+  // topBar 工具栏
+  const topBar = (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: designSystem.spacing[1],
+        padding: designSystem.spacing[1],
+        width: '100%',
+      }}
+    >
+      <Space>
+        <Button icon={<ArrowLeftOutlined />} onClick={onBack}>
+          返回任务
+        </Button>
+        <div style={{
+          borderLeft: `1px solid ${designSystem.colors.neutral[200]}`,
+          paddingLeft: designSystem.spacing[3],
+          fontSize: designSystem.typography.fontSize.sm,
+          fontWeight: designSystem.typography.fontWeight.semibold,
+        }}>
+          {formatDocumentLabel(report.pair.left_document_id, documentLookup, leftDocument)} ↔{' '}
+          {formatDocumentLabel(report.pair.right_document_id, documentLookup, rightDocument)}
+        </div>
+      </Space>
+      <Space>
+        <Button
+          icon={<DownloadOutlined />}
+          onClick={handleDownloadComparison}
+          disabled={!report}
+        >
+          下载对比结果
+        </Button>
+        {currentPair && pairOptions.length > 0 && (
+          <PairSwitcher
+            pairs={pairOptions}
+            currentPair={currentPair}
+            loading={pairsLoading}
+            error={pairsError}
+            documentLookup={documentLookup}
+            currentLeftDocument={leftDocument}
+            currentRightDocument={rightDocument}
+            onSwitchPair={onSwitchPair}
+          />
         )}
-        <main className="flex-1 min-h-0 overflow-hidden">
-          <div className="relative flex h-full min-h-0 flex-col gap-3 p-4">
-            <div className="grid flex-1 min-h-0 grid-cols-1 gap-3 xl:grid-cols-2">
-              <DocumentPane
-                title="左侧文档"
-                segments={leftSegments}
-                activeKey={activeKey}
-                side="left"
-                matches={matches}
-                onSelectMatch={(key) => handleSelectMatch(key, 'left')}
-              />
-              <DocumentPane
-                title="右侧文档"
-                segments={rightSegments}
-                activeKey={activeKey}
-                side="right"
-                matches={matches}
-                onSelectMatch={(key) => handleSelectMatch(key, 'right')}
-              />
-            </div>
+      </Space>
+    </div>
+  );
 
+  // 左侧匹配列表
+  const leftSidebar = (
+    <div
+      data-match-list
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{
+        padding: `${designSystem.spacing[2]} ${designSystem.spacing[3]}`,
+        borderBottom: `1px solid ${designSystem.colors.neutral[200]}`,
+        background: designSystem.semantic.surface.background,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <Text strong style={{ fontSize: designSystem.typography.fontSize.xs, textTransform: 'uppercase' }}>
+          匹配列表
+        </Text>
+        <span style={{
+          fontSize: designSystem.typography.fontSize.xs,
+          fontFamily: 'monospace',
+          color: designSystem.semantic.text.secondary,
+          background: designSystem.semantic.surface.base,
+          padding: `${designSystem.spacing[0]} ${designSystem.spacing[1]}`,
+          borderRadius: designSystem.borderRadius.sm,
+        }}>
+          {matches.length}
+        </span>
+      </div>
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {matches.length === 0 ? (
+          <div style={{ padding: designSystem.spacing[3], fontSize: designSystem.typography.fontSize.xs, color: designSystem.semantic.text.secondary }}>
+            未发现匹配结果。
           </div>
-        </main>
-        <aside className={cn(
-          "relative flex flex-col border-l border-border bg-card shadow-sm transition-all duration-300",
-          sidebarCollapsed ? "w-0 max-w-0" : "w-64 min-w-[16rem]"
-        )}>
-          <button
-            type="button"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className={cn(
-              'absolute left-0 top-1/2 z-20 inline-flex h-12 w-5 -translate-y-1/2 -translate-x-full items-center justify-center rounded-md border border-border bg-background shadow-lg transition hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary/40'
-            )}
-            title={sidebarCollapsed ? '展开匹配列表' : '折叠匹配列表'}
-          >
-            {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            <span className="sr-only">{sidebarCollapsed ? '展开' : '折叠'}匹配列表</span>
-          </button>
-          {!sidebarCollapsed && (
+        ) : (
+          matches.map((match, index) => {
+            const { group } = match;
+            const isActive = match.key === activeKey;
+            const finalScore = group.final_score || 0;
+            return (
+              <button
+                key={match.key}
+                onClick={() => handleSelectMatch(match.key, 'left')}
+                data-match-key={match.key}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: designSystem.spacing[1],
+                  padding: `${designSystem.spacing[2]} ${designSystem.spacing[3]}`,
+                  width: '100%',
+                  textAlign: 'left',
+                  fontSize: designSystem.typography.fontSize.sm,
+                  border: 'none',
+                  borderBottom: `1px solid ${designSystem.colors.neutral[100]}`,
+                  borderLeft: isActive ? `2px solid ${designSystem.colors.primary[500]}` : '2px solid transparent',
+                  background: isActive ? designSystem.colors.neutral[50] : designSystem.semantic.surface.base,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = designSystem.semantic.surface.background;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = designSystem.semantic.surface.base;
+                  }
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: designSystem.typography.fontWeight.medium,
+                    color: designSystem.semantic.text.secondary,
+                  }}>
+                    #{index + 1}
+                  </span>
+                  <span style={{
+                    fontSize: designSystem.typography.fontSize.xs,
+                    fontFamily: 'monospace',
+                    fontWeight: designSystem.typography.fontWeight.semibold,
+                    color: getScoreColor(group.final_score),
+                  }}>
+                    {formatScore(group.final_score)}
+                  </span>
+                </div>
+                <div style={{
+                  width: '100%',
+                  height: '4px',
+                  background: designSystem.semantic.surface.background,
+                  borderRadius: designSystem.borderRadius.full,
+                  overflow: 'hidden',
+                }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${finalScore * 100}%`,
+                      background: getScoreBackground(finalScore),
+                      transition: 'all 0.3s',
+                    }}
+                  />
+                </div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: designSystem.spacing[2],
+                  fontSize: '10px',
+                  color: designSystem.semantic.text.secondary,
+                }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <span style={{
+                      width: '4px',
+                      height: '4px',
+                      borderRadius: '50%',
+                      background: designSystem.colors.primary[500],
+                    }} />
+                    {formatScore(group.semantic_score)}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <span style={{
+                      width: '4px',
+                      height: '4px',
+                      borderRadius: '50%',
+                      background: '#a855f7',
+                    }} />
+                    {formatScore(group.cross_score)}
+                  </span>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
+  // 右侧信息面板（可选）
+  const rightSidebar = (
+    <Card
+      size="small"
+      title="匹配信息"
+      style={{ borderRadius: designSystem.borderRadius.lg }}
+    >
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: designSystem.spacing[2],
+        fontSize: designSystem.typography.fontSize.sm,
+      }}>
+        <div>
+          <Text type="secondary">匹配数量:</Text>
+          <div style={{ marginTop: designSystem.spacing[1] }}>
+            <Text strong style={{ fontSize: designSystem.typography.fontSize.lg }}>
+              {matches.length}
+            </Text>
+          </div>
+        </div>
+        {activeKey && (() => {
+          const match = matches.find(m => m.key === activeKey);
+          if (!match) return null;
+          return (
             <>
-              <div className="flex items-center justify-between border-b border-border px-3 py-2 flex-shrink-0 bg-muted/30">
-                <h2 className="text-xs font-semibold text-foreground uppercase tracking-wide">匹配列表</h2>
-                <span className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{matches.length}</span>
+              <div>
+                <Text type="secondary">当前匹配:</Text>
+                <div style={{ marginTop: designSystem.spacing[1] }}>
+                  <Text>#{matches.findIndex(m => m.key === activeKey) + 1}</Text>
+                </div>
               </div>
-              <div className="flex-1 min-h-0 overflow-auto">
-                {matches.length === 0 ? (
-                  <p className="px-3 py-3 text-xs text-muted-foreground">未发现匹配结果。</p>
-                ) : (
-                  <ul className="divide-y divide-border/40">
-                    {matches.map((match, index) => {
-                      const { group } = match;
-                      const isActive = match.key === activeKey;
-                      const finalScore = group.final_score || 0;
-                      return (
-                        <li key={match.key}>
-                          <button
-                            onClick={() => handleSelectMatch(match.key, 'left')}
-                            className={cn(
-                              'flex w-full flex-col gap-1.5 px-3 py-2 text-left text-sm transition-colors relative',
-                              isActive ? 'bg-primary/10 border-l-2 border-primary' : 'hover:bg-accent/60 border-l-2 border-transparent'
-                            )}
-                            data-match-key={match.key}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-medium text-muted-foreground">#{index + 1}</span>
-                              <span className={cn('text-xs font-mono font-semibold', getScoreColorClasses(group.final_score))}>{formatScore(group.final_score)}</span>
-                            </div>
-                            {/* 迷你进度条 */}
-                            <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
-                              <div
-                                className={cn('h-full transition-all', getScoreColorClasses(finalScore, true))}
-                                style={{ width: `${finalScore * 100}%` }}
-                              />
-                            </div>
-                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                              <span className="flex items-center gap-0.5">
-                                <span className="w-1 h-1 rounded-full bg-blue-500"></span>
-                                {formatScore(group.semantic_score)}
-                              </span>
-                              <span className="flex items-center gap-0.5">
-                                <span className="w-1 h-1 rounded-full bg-purple-500"></span>
-                                {formatScore(group.cross_score)}
-                              </span>
-                            </div>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
+              <div>
+                <Text type="secondary">相似度:</Text>
+                <div style={{ marginTop: designSystem.spacing[1] }}>
+                  <Text strong style={{ fontSize: designSystem.typography.fontSize.lg, color: getScoreColor(match.group.final_score) }}>
+                    {formatScore(match.group.final_score)}
+                  </Text>
+                </div>
               </div>
             </>
-          )}
-        </aside>
+          );
+        })()}
       </div>
-    </PageShell>
+    </Card>
+  );
+
+  // 底部状态栏
+  const bottomBar = (
+    <>
+      <span>匹配数量: {matches.length}</span>
+      <span>文档对 ID: {report.pair.id}</span>
+      {activeKey && <span>当前选中: #{matches.findIndex(m => m.key === activeKey) + 1}</span>}
+    </>
+  );
+
+  // ==================== 渲染 ====================
+  return (
+    <PageLayout
+      topBar={topBar}
+      leftSidebar={leftSidebar}
+      leftSidebarWidth="280px"
+      leftDefaultCollapsed={leftCollapsed}
+      onLeftCollapsedChange={setLeftCollapsed}
+      rightSidebar={rightSidebar}
+      rightDefaultCollapsed={rightCollapsed}
+      onRightCollapsedChange={setRightCollapsed}
+      bottomBar={bottomBar}
+    >
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        background: designSystem.semantic.surface.base,
+        padding: designSystem.spacing[1],
+        position: 'relative',
+      }}>
+        {isTransitioning && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(4px)',
+          }}>
+            <Spin tip="正在切换文档..." />
+          </div>
+        )}
+        <Row gutter={[parseInt(designSystem.spacing[1]), parseInt(designSystem.spacing[1])]} style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+          <Col xs={24} xl={12} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, height: '100%' }}>
+            <DocumentPane
+              title="左侧文档"
+              segments={leftSegments}
+              activeKey={activeKey}
+              side="left"
+              matches={matches}
+              onSelectMatch={(key) => handleSelectMatch(key, 'left')}
+            />
+          </Col>
+          <Col xs={24} xl={12} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, height: '100%' }}>
+            <DocumentPane
+              title="右侧文档"
+              segments={rightSegments}
+              activeKey={activeKey}
+              side="right"
+              matches={matches}
+              onSelectMatch={(key) => handleSelectMatch(key, 'right')}
+            />
+          </Col>
+        </Row>
+      </div>
+    </PageLayout>
   );
 }
+
+// ==================== 子组件 ====================
 
 interface DocumentPaneProps {
   title: string;
@@ -384,16 +554,48 @@ interface DocumentPaneProps {
 
 function DocumentPane({ title, segments, activeKey, side, matches, onSelectMatch }: DocumentPaneProps) {
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-      <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5 text-xs font-semibold text-foreground bg-muted/30 uppercase tracking-wide">
-        <span>{title}</span>
+    <Card
+      title={title}
+      size="small"
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        borderRadius: designSystem.borderRadius.lg,
+      }}
+      bodyStyle={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        overflow: 'hidden',
+        padding: 0,
+      }}
+    >
+      <div
+        data-document-pane
+        style={{
+          flex: 1,
+          overflow: 'auto',
+          background: designSystem.semantic.surface.base,
+          padding: designSystem.spacing[3],
+          fontSize: '13px',
+          lineHeight: 1.8,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          textAlign: 'justify',
+        }}
+      >
+        <RenderSegments
+          segments={segments}
+          activeKey={activeKey}
+          side={side}
+          matches={matches}
+          onSelectMatch={onSelectMatch}
+        />
       </div>
-      <div className="relative flex-1 min-h-0 min-w-0 overflow-auto bg-background">
-        <article className="min-w-0 whitespace-pre-wrap break-words px-4 py-3 text-[13px] leading-relaxed text-justify">
-          <RenderSegments segments={segments} activeKey={activeKey} side={side} matches={matches} onSelectMatch={onSelectMatch} />
-        </article>
-      </div>
-    </div>
+    </Card>
   );
 }
 
@@ -418,8 +620,13 @@ function PairSwitcher({
   currentRightDocument,
   onSwitchPair,
 }: PairSwitcherProps) {
-  const [leftSelection, setLeftSelection] = useState<number>(currentPair?.left_document_id ?? 0);
-  const [rightSelection, setRightSelection] = useState<number>(currentPair?.id ?? 0);
+  // 使用 currentPair 的实际值，如果不存在则使用第一个 pair 的值
+  const [leftSelection, setLeftSelection] = useState<number>(() =>
+    currentPair?.left_document_id ?? pairs[0]?.left_document_id ?? 0
+  );
+  const [rightSelection, setRightSelection] = useState<number>(() =>
+    currentPair?.id ?? pairs[0]?.id ?? 0
+  );
 
   const uniqueLefts = useMemo(() => Array.from(new Set(pairs.map((pair) => pair.left_document_id))), [pairs]);
 
@@ -431,9 +638,7 @@ function PairSwitcher({
   }, [currentPair]);
 
   useEffect(() => {
-    if (uniqueLefts.length === 0 || !currentPair) {
-      return;
-    }
+    if (uniqueLefts.length === 0 || !currentPair) return;
     if (!uniqueLefts.includes(leftSelection)) {
       setLeftSelection(currentPair.left_document_id);
     }
@@ -457,9 +662,7 @@ function PairSwitcher({
 
   const handleLeftChange = (value: string) => {
     const nextLeft = Number(value);
-    if (Number.isNaN(nextLeft) || !currentPair) {
-      return;
-    }
+    if (Number.isNaN(nextLeft) || !currentPair) return;
     setLeftSelection(nextLeft);
     if (currentPair.left_document_id !== nextLeft) {
       const nextPair = pairs
@@ -487,9 +690,7 @@ function PairSwitcher({
   };
 
   const handlePrev = () => {
-    if (!canPrev) {
-      return;
-    }
+    if (!canPrev) return;
     const prevPair = pairsForLeft[currentIndex - 1];
     if (prevPair) {
       onSwitchPair(prevPair.id);
@@ -497,9 +698,7 @@ function PairSwitcher({
   };
 
   const handleNext = () => {
-    if (!canNext) {
-      return;
-    }
+    if (!canNext) return;
     const nextPair = pairsForLeft[currentIndex + 1];
     if (nextPair) {
       onSwitchPair(nextPair.id);
@@ -507,86 +706,67 @@ function PairSwitcher({
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <Space size="middle">
       {error && (
-        <span className="text-sm text-destructive bg-destructive/10 px-2 py-1 rounded">{error}</span>
+        <Text type="danger" style={{
+          fontSize: designSystem.typography.fontSize.sm,
+          background: 'rgba(255, 77, 79, 0.1)',
+          padding: `${designSystem.spacing[1]} ${designSystem.spacing[2]}`,
+          borderRadius: designSystem.borderRadius.sm,
+        }}>
+          {error}
+        </Text>
       )}
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm text-muted-foreground">左侧:</span>
-          <Select
-            value={String(leftSelection)}
-            onValueChange={handleLeftChange}
-            disabled={disableLeftSelect || loading}
-          >
-            <SelectTrigger className="h-9 w-[140px] px-3 text-sm hover:border-primary focus:border-primary">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="start" className="max-h-64">
-              {uniqueLefts.map((left) => (
-                <SelectItem key={left} value={String(left)} className="text-sm">
-                  <span className="block truncate">
-                    {formatDocumentLabel(
-                      left,
-                      documentLookup,
-                      left === currentPair?.left_document_id ? currentLeftDocument : null,
-                    )}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm text-muted-foreground">右侧:</span>
-          <Select
-            value={String(rightSelection)}
-            onValueChange={handleRightChange}
-            disabled={disableRightSelect || loading}
-          >
-            <SelectTrigger className="h-9 w-[140px] px-3 text-sm hover:border-primary focus:border-primary">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="start" className="max-h-64">
-              {pairsForLeft.map((pair) => (
-                <SelectItem key={pair.id} value={String(pair.id)} className="text-sm">
-                  <span className="block truncate">
-                    {formatDocumentLabel(
-                      pair.right_document_id,
-                      documentLookup,
-                      pair.id === currentPair?.id ? currentRightDocument : null,
-                    )}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div className="h-9 w-px bg-border" />
-      <div className="flex items-center gap-1">
-        <Button
-          variant="default"
-          size="sm"
-          onClick={handlePrev}
-          disabled={!canPrev || loading}
-          title="上一个配对"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          <span className="sr-only">上一个</span>
-        </Button>
-        <Button
-          variant="default"
-          size="sm"
-          onClick={handleNext}
-          disabled={!canNext || loading}
-          title="下一个配对"
-        >
-          <ChevronRight className="h-4 w-4" />
-          <span className="sr-only">下一个</span>
-        </Button>
-      </div>
-    </div>
+      <Text style={{ fontSize: designSystem.typography.fontSize.sm, color: designSystem.semantic.text.secondary }}>
+        左侧:
+      </Text>
+      <Select
+        value={String(leftSelection)}
+        onChange={handleLeftChange}
+        disabled={disableLeftSelect || loading}
+        style={{ width: 160 }}
+        options={uniqueLefts.map((left) => ({
+          value: String(left),
+          label: formatDocumentLabel(
+            left,
+            documentLookup,
+            left === currentPair?.left_document_id ? currentLeftDocument : null,
+          ),
+        }))}
+      />
+      <Text style={{ fontSize: designSystem.typography.fontSize.sm, color: designSystem.semantic.text.secondary }}>
+        右侧:
+      </Text>
+      <Select
+        value={String(rightSelection)}
+        onChange={handleRightChange}
+        disabled={disableRightSelect || loading}
+        style={{ width: 160 }}
+        options={pairsForLeft.map((pair) => ({
+          value: String(pair.id),
+          label: formatDocumentLabel(
+            pair.right_document_id,
+            documentLookup,
+            pair.id === currentPair?.id ? currentRightDocument : null,
+          ),
+        }))}
+      />
+      <div style={{ height: '32px', width: '1px', background: designSystem.semantic.border.light }} />
+      <Button
+        type="default"
+        onClick={handlePrev}
+        disabled={!canPrev || loading}
+        title="上一个配对"
+        icon={<LeftOutlined />}
+      />
+      <Button
+        type="default"
+        onClick={handleNext}
+        disabled={!canNext || loading}
+        title="下一个配对"
+        icon={<RightOutlined />}
+      />
+    </Space>
   );
 }
 
@@ -599,123 +779,137 @@ interface RenderSegmentsProps {
 }
 
 const RenderSegments = memo(({ segments, activeKey, side, matches, onSelectMatch }: RenderSegmentsProps) => {
+  if (!segments.length) return null;
 
-  if (!segments.length) {
-    return null;
-  }
+  return (
+    <>
+      {segments.map((segment, index) => {
+        if (!segment.matchKey) {
+          return <span key={`plain-${index}`}>{segment.text}</span>;
+        }
 
+        const match = matches.find(m => m.key === segment.matchKey) || null;
+        const isActive = activeKey === segment.matchKey;
+        const ordinal = segment.ordinal ?? 0;
 
-  return <>{segments.map((segment, index) => {
-    if (!segment.matchKey) {
-      return <span key={`plain-${index}`}>{segment.text}</span>;
-    }
+        const hasOverlaps = segment.allMatches && segment.allMatches.length > 1;
+        const overlappingMatches: MatchData[] = hasOverlaps
+          ? segment.allMatches!
+              .map(am => matches.find(m => m.key === am.matchKey))
+              .filter((m): m is NormalisedMatch => m !== undefined && m !== null)
+              .map(m => ({ group: m.group, details: m.details }))
+          : (match ? [{ group: match.group, details: match.details }] : []);
 
-    const match = matches.find(m => m.key === segment.matchKey) || null;
-    const isActive = activeKey === segment.matchKey;
-    const ordinal = segment.ordinal ?? 0;
+        const baseStyle: React.CSSProperties = {
+          borderRadius: designSystem.borderRadius.sm,
+          transition: 'all 0.2s',
+          cursor: 'pointer',
+          wordBreak: 'break-word',
+        };
 
-    // Check if this segment has overlapping matches
-    const hasOverlaps = segment.allMatches && segment.allMatches.length > 1;
-    const overlappingMatches: MatchData[] = hasOverlaps
-      ? segment.allMatches!
-          .map(am => matches.find(m => m.key === am.matchKey))
-          .filter((m): m is NormalisedMatch => m !== undefined && m !== null)
-          .map(m => ({ group: m.group, details: m.details }))
-      : (match ? [{ group: match.group, details: match.details }] : []);
-    const baseClasses =
-      'rounded-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary/60 break-words match-highlight';
+        const colorStyle = getScoreStyle(match?.group?.final_score);
+        const backgroundStyle: React.CSSProperties =
+          segment.mode === 'block'
+            ? { ...colorStyle, color: designSystem.semantic.text.primary }
+            : {
+                ...colorStyle,
+                color: designSystem.semantic.text.primary,
+                textDecoration: 'underline',
+                textDecorationColor: '#000',
+                textDecorationThickness: '2px',
+                textUnderlineOffset: '2px',
+              };
 
-    // Determine background color based on final_score
-    const colorClasses = getScoreColorClasses(match?.group?.final_score, true);
-    const backgroundClasses =
-      segment.mode === 'block'
-        ? `${colorClasses} text-foreground`
-        : `${colorClasses} text-foreground underline decoration-black decoration-2 underline-offset-2`;
-    const activeClasses = isActive ? 'active-match' : '';
-
-    // Add visual indicator for multiple overlapping matches
-    const overlappingClasses = hasOverlaps
-      ? 'ring-2 ring-primary/40 ring-offset-1'
-      : '';
-
-    if (!match) {
-      // No match found - still render for visual consistency
-      return (
-        <mark
-          key={`highlight-${index}`}
-          id={makeHighlightId(side, segment.matchKey || '', ordinal)}
-          className={cn(baseClasses, backgroundClasses, activeClasses, overlappingClasses)}
-          tabIndex={0}
-          data-match-keys={segment.matchKey}
-          data-side={side}
-          data-mode={segment.mode}
-          data-ordinal={ordinal}
-          onClick={() => onSelectMatch(segment.matchKey!)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              onSelectMatch(segment.matchKey!);
+        const activeStyle: React.CSSProperties = isActive
+          ? {
+              outline: `2px solid ${designSystem.colors.primary[500]}`,
+              outlineOffset: '1px',
             }
-          }}
-        >
-          {segment.text}
-        </mark>
-      );
-    }
+          : {};
 
-    return (
-      <MatchInfoTooltip key={`highlight-${index}`} match={match} allMatches={overlappingMatches}>
-        <mark
-          id={makeHighlightId(side, segment.matchKey || '', ordinal)}
-          className={cn(baseClasses, backgroundClasses, activeClasses, overlappingClasses)}
-          tabIndex={0}
-          data-match-keys={segment.matchKey}
-          data-side={side}
-          data-mode={segment.mode}
-          data-ordinal={ordinal}
-          onClick={() => {
-            onSelectMatch(segment.matchKey!);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              onSelectMatch(segment.matchKey!);
+        const overlappingStyle: React.CSSProperties = hasOverlaps
+          ? {
+              boxShadow: `0 0 0 2px ${designSystem.colors.primary[300]}`,
             }
-          }}
-        >
-          {segment.text}
-        </mark>
-      </MatchInfoTooltip>
-    );
-  })}</>;
+          : {};
+
+        const finalStyle = { ...baseStyle, ...backgroundStyle, ...activeStyle, ...overlappingStyle };
+
+        if (!match) {
+          return (
+            <mark
+              key={`highlight-${index}`}
+              id={makeHighlightId(side, segment.matchKey || '', ordinal)}
+              className="match-highlight"
+              style={finalStyle}
+              tabIndex={0}
+              data-match-keys={segment.matchKey}
+              data-match-key={segment.matchKey}
+              data-side={side}
+              data-mode={segment.mode}
+              data-ordinal={ordinal}
+              onClick={() => onSelectMatch(segment.matchKey!)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelectMatch(segment.matchKey!);
+                }
+              }}
+            >
+              {segment.text}
+            </mark>
+          );
+        }
+
+        return (
+          <MatchInfoTooltip key={`highlight-${index}`} match={match} allMatches={overlappingMatches}>
+            <mark
+              id={makeHighlightId(side, segment.matchKey || '', ordinal)}
+              className="match-highlight"
+              style={finalStyle}
+              tabIndex={0}
+              data-match-keys={segment.matchKey}
+              data-match-key={segment.matchKey}
+              data-side={side}
+              data-mode={segment.mode}
+              data-ordinal={ordinal}
+              onClick={() => onSelectMatch(segment.matchKey!)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelectMatch(segment.matchKey!);
+                }
+              }}
+            >
+              {segment.text}
+            </mark>
+          </MatchInfoTooltip>
+        );
+      })}
+    </>
+  );
 });
 
+// ==================== 辅助函数 ====================
+
 function prepareIntervals(text: string, matches: NormalisedMatch[], side: Side): HighlightInterval[] {
-  if (!text) {
-    return [];
-  }
+  if (!text) return [];
   const raw: HighlightInterval[] = [];
   const ordinalMap = new Map<string, number>();
   const seen = new Set<string>();
   matches.forEach((match) => {
-    // Try document_spans first, fallback to paragraph_spans
     const spans = match.group.document_spans ?? match.group.paragraph_spans ?? [];
-
-
     const sideSpans = spans
       .map((span) => ({
         start: side === 'left' ? span.left_start : span.right_start,
         end: side === 'left' ? span.left_end : span.right_end,
       }))
       .filter((item) => {
-        // More robust validation - allow zero positions
         return Number.isFinite(item.start) && Number.isFinite(item.end) &&
                item.start >= 0 && item.end >= 0 && item.end > item.start;
       });
 
-    if (!sideSpans.length) {
-      return;
-    }
+    if (!sideSpans.length) return;
 
     const coverage = match.group.alignment_ratio ?? 0;
     const coverageThreshold = 0.75;
@@ -742,9 +936,7 @@ function prepareIntervals(text: string, matches: NormalisedMatch[], side: Side):
     if (coverage < coverageThreshold) {
       sideSpans.forEach(({ start, end }) => {
         const key = `${match.key}:${Math.floor(start)}:${Math.floor(end)}:fragment`;
-        if (seen.has(key)) {
-          return;
-        }
+        if (seen.has(key)) return;
         seen.add(key);
         raw.push({
           start: start,
@@ -760,12 +952,63 @@ function prepareIntervals(text: string, matches: NormalisedMatch[], side: Side):
 
     ordinalMap.set(match.key, nextOrdinal);
   });
-  return raw;  // 不再需要 mergeIntervals，因为 buildSegmentsWithOverlap 会处理重叠
+  return raw;
 }
 
 function makeHighlightId(side: Side, matchKey: string, ordinal: number) {
   return `${side}-match-${matchKey}-${ordinal}`;
 }
+
+function formatScore(value: number | null | undefined) {
+  if (value == null) return '—';
+  return value.toFixed(3);
+}
+
+function getScoreColor(score: number | null | undefined): string {
+  const finalScore = score || 0;
+  if (finalScore > 0.9) return '#b91c1c';
+  if (finalScore >= 0.85) return '#c2410c';
+  if (finalScore >= 0.8) return '#a16207';
+  if (finalScore >= 0.7) return '#15803d';
+  return '#6b7280';
+}
+
+function getScoreBackground(score: number | null | undefined): string {
+  const finalScore = score || 0;
+  if (finalScore > 0.9) return 'rgba(239, 68, 68, 0.75)';
+  if (finalScore >= 0.85) return 'rgba(249, 115, 22, 0.7)';
+  if (finalScore >= 0.8) return 'rgba(250, 204, 21, 0.65)';
+  if (finalScore >= 0.7) return 'rgba(34, 197, 94, 0.65)';
+  return 'rgba(156, 163, 175, 0.6)';
+}
+
+function getScoreStyle(score: number | null | undefined): React.CSSProperties {
+  const finalScore = score || 0;
+  if (finalScore > 0.9) {
+    return { background: 'rgba(239, 68, 68, 0.75)' };
+  } else if (finalScore >= 0.85) {
+    return { background: 'rgba(249, 115, 22, 0.7)' };
+  } else if (finalScore >= 0.8) {
+    return { background: 'rgba(250, 204, 21, 0.65)' };
+  } else if (finalScore >= 0.7) {
+    return { background: 'rgba(34, 197, 94, 0.65)' };
+  } else {
+    return { background: 'rgba(156, 163, 175, 0.6)' };
+  }
+}
+
+function formatDocumentLabel(
+  documentId: number,
+  lookup: DocumentLookup,
+  fallback?: DocumentDetail | DocumentSummary | null,
+) {
+  const info = lookup[documentId] ?? fallback ?? null;
+  if (!info) return `文档 ${documentId}`;
+  const name = info.title || info.filename || `文档 ${info.id ?? documentId}`;
+  return name;
+}
+
+// ==================== Markdown 导出函数 ====================
 
 function formatMetricTitle(key: string): string {
   return key
@@ -776,9 +1019,7 @@ function formatMetricTitle(key: string): string {
 }
 
 function formatMetricValue(value: unknown): string {
-  if (value === null || value === undefined) {
-    return '—';
-  }
+  if (value === null || value === undefined) return '—';
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value.toFixed(3);
   }
@@ -787,9 +1028,7 @@ function formatMetricValue(value: unknown): string {
 
 function formatAverageScore(values: Array<number | null | undefined>): string {
   const numeric = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-  if (!numeric.length) {
-    return '—';
-  }
+  if (!numeric.length) return '—';
   const average = numeric.reduce((sum, value) => sum + value, 0) / numeric.length;
   return average.toFixed(3);
 }
@@ -884,9 +1123,7 @@ function buildHighSimilarityMarkdownTable({
   rightDocument,
   maxRows = 50,
 }: HighSimilarityTableOptions): string[] {
-  if (!matches.length) {
-    return [];
-  }
+  if (!matches.length) return [];
 
   const leftText = leftDocument?.processed_text ?? null;
   const rightText = rightDocument?.processed_text ?? null;
@@ -943,16 +1180,12 @@ function buildHighSimilarityMarkdownTable({
 }
 
 function selectPrimaryDetail(details: MatchDetailModel[]): MatchDetailModel | undefined {
-  if (!details?.length) {
-    return undefined;
-  }
+  if (!details?.length) return undefined;
   return [...details].sort((a, b) => (b.final_score ?? 0) - (a.final_score ?? 0))[0];
 }
 
 function extractExcerpt(fullText: string, start: number, end: number, radius = 80): string {
-  if (!fullText) {
-    return '—';
-  }
+  if (!fullText) return '—';
 
   const safeStart = Number.isFinite(start) ? Math.max(0, Math.min(start, fullText.length)) : 0;
   const safeEnd = Number.isFinite(end) ? Math.max(safeStart, Math.min(end, fullText.length)) : safeStart;
@@ -961,32 +1194,18 @@ function extractExcerpt(fullText: string, start: number, end: number, radius = 8
   const windowEnd = Math.min(fullText.length, safeEnd + radius);
   let snippet = fullText.slice(windowStart, windowEnd).replace(/\s+/g, ' ').trim();
 
-  if (!snippet) {
-    return '—';
-  }
+  if (!snippet) return '—';
 
-  if (windowStart > 0) {
-    snippet = `…${snippet}`;
-  }
-  if (windowEnd < fullText.length) {
-    snippet = `${snippet}…`;
-  }
+  if (windowStart > 0) snippet = `…${snippet}`;
+  if (windowEnd < fullText.length) snippet = `${snippet}…`;
   return snippet;
 }
 
 function scoreStyleForMarkdown(score: number): string {
-  if (!Number.isFinite(score)) {
-    return 'background:#f8fafc;color:#1f2937;';
-  }
-  if (score >= 0.9) {
-    return 'background:rgba(239,68,68,0.18);color:#7f1d1d;';
-  }
-  if (score >= 0.85) {
-    return 'background:rgba(249,115,22,0.16);color:#7c2d12;';
-  }
-  if (score >= 0.8) {
-    return 'background:rgba(250,204,21,0.14);color:#713f12;';
-  }
+  if (!Number.isFinite(score)) return 'background:#f8fafc;color:#1f2937;';
+  if (score >= 0.9) return 'background:rgba(239,68,68,0.18);color:#7f1d1d;';
+  if (score >= 0.85) return 'background:rgba(249,115,22,0.16);color:#7c2d12;';
+  if (score >= 0.8) return 'background:rgba(250,204,21,0.14);color:#713f12;';
   return 'background:#f8fafc;color:#1f2937;';
 }
 
@@ -998,30 +1217,19 @@ interface ResolveExcerptOptions {
 }
 
 function resolveExcerpt({ detail, side, fullText, radius = 80 }: ResolveExcerptOptions): string {
-  if (!detail) {
-    return '—';
-  }
+  if (!detail) return '—';
 
   const direct = side === 'left' ? detail.left_excerpt : detail.right_excerpt;
-  if (direct && direct.trim()) {
-    return direct.trim();
-  }
+  if (direct && direct.trim()) return direct.trim();
 
   const spans = detail.spans;
-  if (!Array.isArray(spans) || spans.length === 0) {
-    return '—';
-  }
+  if (!Array.isArray(spans) || spans.length === 0) return '—';
   const first = spans[0];
   const start = side === 'left' ? first.left_start : first.right_start;
   const end = side === 'left' ? first.left_end : first.right_end;
 
-  if (typeof start !== 'number' || typeof end !== 'number' || end <= start) {
-    return '—';
-  }
-
-  if (!fullText) {
-    return '—';
-  }
+  if (typeof start !== 'number' || typeof end !== 'number' || end <= start) return '—';
+  if (!fullText) return '—';
 
   return extractExcerpt(fullText, start, end, radius);
 }
@@ -1035,43 +1243,3 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
     .replace(/\n/g, '<br/>');
 }
-
-function formatDocumentLabel(
-  documentId: number,
-  lookup: DocumentLookup,
-  fallback?: DocumentDetail | DocumentSummary | null,
-) {
-  const info = lookup[documentId] ?? fallback ?? null;
-  if (!info) {
-    return `文档 ${documentId}`;
-  }
-  const name = info.title || info.filename || `文档 ${info.id ?? documentId}`;
-  return name;
-}
-
-
-function formatScore(value: number | null | undefined) {
-  if (value == null) {
-    return '—';
-  }
-  return value.toFixed(3);
-}
-
-function getScoreColorClasses(score: number | null | undefined, isBackground = false): string {
-  const finalScore = score || 0;
-  if (finalScore > 0.9) {
-    return isBackground ? 'bg-red-500/75 hover:bg-red-500/85' : 'text-red-700';
-  } else if (finalScore >= 0.85) {
-    return isBackground ? 'bg-orange-400/70 hover:bg-orange-400/80' : 'text-orange-700';
-  } else if (finalScore >= 0.8) {
-    return isBackground ? 'bg-yellow-400/65 hover:bg-yellow-400/75' : 'text-yellow-700';
-  } else if (finalScore >= 0.7) {
-    return isBackground ? 'bg-green-400/65 hover:bg-green-400/75' : 'text-green-700';
-  } else {
-    return isBackground ? 'bg-gray-300/60 hover:bg-gray-300/70' : 'text-gray-600';
-  }
-}
-
-// 删除了 clamp 函数 - 不再需要
-
-export default PlanComparePage;

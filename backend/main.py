@@ -1,12 +1,14 @@
+from contextlib import asynccontextmanager
+
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from backend.api.v1 import health, documents, compare, projects, metrics, progress, llm, reports
+from prometheus_fastapi_instrumentator import Instrumentator
+
+from backend.api.v1 import compare, documents, health, llm, metrics, progress, projects, reports
 from backend.core.config import get_settings
 from backend.core.middleware import error_handler
 from backend.db import init_db
-from prometheus_fastapi_instrumentator import Instrumentator
-import structlog
 
 # 配置结构化日志
 structlog.configure(
@@ -39,7 +41,7 @@ async def lifespan(app: FastAPI):
         mode=settings.milvus_mode,
         api_prefix=settings.api_v1_prefix
     )
-    
+
     # 初始化资源
     try:
         await init_db()
@@ -127,28 +129,29 @@ if __name__ == "__main__":
     import subprocess
     import sys
     from pathlib import Path
-    
+
     # 获取 run.py 的路径
     run_script = Path(__file__).parent.parent / "run.py"
-    
+
     if run_script.exists():
         # 使用 run.py 启动，它会处理端口清理等
         print("Starting application via run.py...")
         subprocess.run([sys.executable, str(run_script)])
     else:
         # 简单的备用启动
-        import uvicorn
         import os
-        
+
+        import uvicorn
+
         # 添加项目根目录到Python路径
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        
+
         port = int(os.getenv("PORT", 8000))
-        
+
         print(f"🚀 Starting FastAPI application on http://0.0.0.0:{port}")
         print(f"📚 API documentation: http://localhost:{port}/docs")
         print("Press CTRL+C to stop\n")
-        
+
         try:
             uvicorn.run(
                 "app.main:app",

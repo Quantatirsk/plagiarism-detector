@@ -1,18 +1,17 @@
 """SQLModel engine/session helpers for the plagiarism detector."""
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional
 
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from backend.core.config import get_settings
 
-_engine: Optional[AsyncEngine] = None
-_sessionmaker: Optional[sessionmaker] = None
+_engine: AsyncEngine | None = None
+_sessionmaker: async_sessionmaker[AsyncSession] | None = None
 
 
 def get_engine() -> AsyncEngine:
@@ -21,8 +20,8 @@ def get_engine() -> AsyncEngine:
     if _engine is None:
         settings = get_settings()
         _engine = create_async_engine(settings.database_url, echo=False, future=True)
-        _sessionmaker = sessionmaker(
-            bind=_engine,
+        _sessionmaker = async_sessionmaker(
+            _engine,
             class_=AsyncSession,
             expire_on_commit=False
         )
@@ -30,7 +29,7 @@ def get_engine() -> AsyncEngine:
     return _engine
 
 
-def _get_sessionmaker() -> sessionmaker:
+def _get_sessionmaker() -> async_sessionmaker[AsyncSession]:
     if _sessionmaker is None:
         get_engine()
     assert _sessionmaker is not None

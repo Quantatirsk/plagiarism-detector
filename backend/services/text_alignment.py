@@ -1,6 +1,5 @@
 """Precise text alignment service for identifying matching text spans."""
 from difflib import SequenceMatcher
-from typing import List, Tuple
 
 
 class TextAlignmentService:
@@ -12,7 +11,7 @@ class TextAlignmentService:
         right_text: str,
         min_match_length: int = 20,
         similarity_threshold: float = 0.8
-    ) -> List[Tuple[int, int, int, int]]:
+    ) -> list[tuple[int, int, int, int]]:
         """
         返回匹配的文本片段位置
         Returns: [(left_start, left_end, right_start, right_end), ...]
@@ -42,7 +41,7 @@ class TextAlignmentService:
                 pos += 1
         return pos
 
-    def _merge_overlapping_spans(self, spans: List[Tuple[int, int, int, int]]) -> List[Tuple[int, int, int, int]]:
+    def _merge_overlapping_spans(self, spans: list[tuple[int, int, int, int]]) -> list[tuple[int, int, int, int]]:
         """合并重叠的span"""
         if not spans:
             return []
