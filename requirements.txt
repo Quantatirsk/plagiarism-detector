@@ -43,7 +43,7 @@ pydantic==2.11.7
 pydantic-settings==2.10.1
 pydantic_core==2.33.2
 pymilvus>=2.6.3
-pymilvus[model]==2.5.1
+pymilvus[model]>=2.6.3
 pytest==7.4.3
 pytest-asyncio==0.21.1
 python-dateutil==2.9.0.post0
