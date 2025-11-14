@@ -83,6 +83,8 @@ python-docx>=1.2.0
 spacy>=3.7.0
 langdetect>=1.0.9
 aiofiles>=23.1.0
+aiosqlite>=0.21.0
+
 
 # Milvus
 pymilvus[milvus-lite]>=2.5.1
