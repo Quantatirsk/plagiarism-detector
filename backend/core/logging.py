@@ -17,7 +17,7 @@ def configure_logging(
 ) -> None:
     """
     配置结构化日志系统
-    
+
     Args:
         level: 日志级别 (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         json_logs: 是否输出JSON格式日志
@@ -113,7 +113,7 @@ def get_logger(
     if initial_context:
         logger = logger.bind(**initial_context)
 
-    return cast(FilteringBoundLogger, logger)
+    return cast("FilteringBoundLogger", logger)
 
 
 class LogContext:
@@ -138,7 +138,7 @@ class LogContext:
 def log_function_call(logger: FilteringBoundLogger):
     """
     函数调用日志装饰器
-    
+
     Args:
         logger: 日志记录器
     """
@@ -182,7 +182,7 @@ def log_function_call(logger: FilteringBoundLogger):
 def log_async_function_call(logger: FilteringBoundLogger):
     """
     异步函数调用日志装饰器
-    
+
     Args:
         logger: 日志记录器
     """
@@ -280,10 +280,10 @@ class LogEvent:
 def create_request_logger(request_id: str) -> FilteringBoundLogger:
     """
     创建请求级别的日志记录器
-    
+
     Args:
         request_id: 请求ID
-    
+
     Returns:
         绑定了请求ID的日志记录器
     """
@@ -293,10 +293,10 @@ def create_request_logger(request_id: str) -> FilteringBoundLogger:
 def create_service_logger(service_name: str) -> FilteringBoundLogger:
     """
     创建服务级别的日志记录器
-    
+
     Args:
         service_name: 服务名称
-    
+
     Returns:
         绑定了服务名称的日志记录器
     """

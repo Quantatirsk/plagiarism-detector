@@ -2,6 +2,7 @@
 LLM API endpoints - 支持聊天完成和流式响应
 """
 import json
+import time as import_time
 from typing import Any
 
 import structlog
@@ -138,13 +139,13 @@ async def create_chat_completion(
 
     except LLMError as e:
         logger.error("LLM error", error=str(e))
-        raise create_http_exception(e)
+        raise create_http_exception(e) from e
     except Exception as e:
         logger.error("Unexpected error in chat completion", error=str(e))
         raise HTTPException(
             status_code=500,
             detail={"error": "Internal server error", "message": str(e)}
-        )
+        ) from e
 
 
 @router.get("/models", response_model=ModelsResponse)
@@ -162,14 +163,10 @@ async def list_models(
         )
     except LLMError as e:
         logger.error("Failed to list models", error=str(e))
-        raise create_http_exception(e)
+        raise create_http_exception(e) from e
     except Exception as e:
         logger.error("Unexpected error listing models", error=str(e))
         raise HTTPException(
             status_code=500,
             detail={"error": "Failed to list models", "message": str(e)}
-        )
-
-
-# 修复缺少的导入
-import time as import_time
+        ) from e

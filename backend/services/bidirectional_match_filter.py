@@ -28,9 +28,9 @@ class BidirectionalMatchFilter:
         """构建双向最佳匹配映射。"""
         # 找出每个左侧段落的最佳右侧匹配
         for match in self.matches:
-            left_id = cast(int, match["left_chunk_id"])
-            right_id = cast(int, match["right_chunk_id"])
-            score = cast(float, match.get("final_score", 0.0))
+            left_id = cast("int", match["left_chunk_id"])
+            right_id = cast("int", match["right_chunk_id"])
+            score = cast("float", match.get("final_score", 0.0))
 
             # 更新左侧的最佳匹配
             if left_id not in self._left_to_right_best or score > self._left_to_right_best[left_id][1]:
@@ -75,9 +75,9 @@ class BidirectionalMatchFilter:
 
         # 添加接近最佳的次优匹配
         for match in self.matches:
-            left_id = cast(int, match["left_chunk_id"])
-            right_id = cast(int, match["right_chunk_id"])
-            score = cast(float, match.get("final_score", 0.0))
+            left_id = cast("int", match["left_chunk_id"])
+            right_id = cast("int", match["right_chunk_id"])
+            score = cast("float", match.get("final_score", 0.0))
 
             # 检查是否接近左侧的最佳匹配
             if left_id in self._left_to_right_best:

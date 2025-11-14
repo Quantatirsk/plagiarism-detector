@@ -4,11 +4,13 @@ from __future__ import annotations
 import asyncio
 import hashlib
 from collections import OrderedDict
-from collections.abc import Sequence
 from time import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from backend.services.base_service import BaseService, singleton
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 PairText = tuple[str, str]
 

@@ -5,25 +5,25 @@
 支持同步和异步两种模式
 """
 
-import asyncio
 import importlib
-from pathlib import Path
-from typing import Optional, Dict, Any, List, cast
 import logging
-from .utils.parser_map import get_parser_map, get_parser_for_file
+from pathlib import Path
+from typing import cast
+
 from .readers_base import BaseParser
+from .utils.parser_map import get_parser_for_file, get_parser_map
 
 logger = logging.getLogger(__name__)
 
 class ReadersService:
     """统一文档读取服务"""
-    
+
     def __init__(self):
         self._parsers = {}
         # 使用集中的映射配置 - Linux 哲学：单一职责
         self._parser_map = get_parser_map()
-    
-    def parse_document(self, file_path: str, **options) -> Optional[str]:
+
+    def parse_document(self, file_path: str, **options) -> str | None:
         """
         解析文档并返回文本内容（同步方法）
 
@@ -44,7 +44,7 @@ class ReadersService:
                 logger.error(f"Parse failed for {file_path}: {e}")
         return None
 
-    async def parse_document_async(self, file_path: str, **options) -> Optional[str]:
+    async def parse_document_async(self, file_path: str, **options) -> str | None:
         """
         异步解析文档并返回文本内容
 
@@ -65,7 +65,7 @@ class ReadersService:
             except Exception as e:
                 logger.error(f"Async parse failed for {file_path}: {e}")
         return None
-    
+
     def _get_parser(self, file_path: str) -> BaseParser | None:
         """获取解析器（延迟加载）"""
         # 使用统一的映射逻辑，包括处理无扩展名文件
@@ -82,26 +82,26 @@ class ReadersService:
             try:
                 module = importlib.import_module(module_path)
                 parser_class = getattr(module, class_name)
-                self._parsers[cache_key] = cast(BaseParser, parser_class())
+                self._parsers[cache_key] = cast("BaseParser", parser_class())
             except Exception as e:
                 logger.info(f"Parser {cache_key} not available: {e}")
                 self._parsers[cache_key] = None
 
-        return cast(BaseParser | None, self._parsers[cache_key])
-    
-    def get_supported_formats(self) -> List[str]:
+        return cast("BaseParser | None", self._parsers[cache_key])
+
+    def get_supported_formats(self) -> list[str]:
         """获取支持的文件格式列表"""
         return list(self._parser_map.keys())
-    
+
     def is_format_supported(self, file_path: str) -> bool:
         """检查文件格式是否支持"""
         ext = Path(file_path).suffix.lower()
         return ext in self._parser_map
-    
-    def get_available_parsers(self) -> Dict[str, bool]:
+
+    def get_available_parsers(self) -> dict[str, bool]:
         """获取各格式解析器的可用性"""
         availability = {}
-        for ext, (module_path, class_name) in self._parser_map.items():
+        for ext, (module_path, _class_name) in self._parser_map.items():
             importlib.import_module(module_path)
             availability[ext] = True
         return availability
@@ -117,11 +117,11 @@ def get_readers_service() -> ReadersService:
     return _readers_service
 
 # 便捷函数
-def parse_document(file_path: str, **options) -> Optional[str]:
+def parse_document(file_path: str, **options) -> str | None:
     """便捷函数：解析文档（同步）"""
     return get_readers_service().parse_document(file_path, **options)
 
-async def parse_document_async(file_path: str, **options) -> Optional[str]:
+async def parse_document_async(file_path: str, **options) -> str | None:
     """便捷函数：解析文档（异步）"""
     return await get_readers_service().parse_document_async(file_path, **options)
 
@@ -129,6 +129,6 @@ def is_format_supported(file_path: str) -> bool:
     """便捷函数：检查格式是否支持"""
     return get_readers_service().is_format_supported(file_path)
 
-def get_supported_formats() -> List[str]:
+def get_supported_formats() -> list[str]:
     """便捷函数：获取支持的格式列表"""
     return get_readers_service().get_supported_formats()

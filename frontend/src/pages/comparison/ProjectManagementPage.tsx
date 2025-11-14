@@ -13,7 +13,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { Input, Button, Card, Modal, Form, message, Empty, Row, Col, Statistic, Descriptions } from 'antd';
 import { PlusOutlined, FolderOutlined, SearchOutlined, FileTextOutlined, CheckCircleOutlined, ArrowLeftOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useComparisonStore } from '@/store/comparisonStore';
-import { useProjects } from '@/hooks/useData';
+import { useDocuments } from '@/hooks/useData';
+import { useComparisonContext } from '@/contexts/useComparisonContext';
 import { plagiarismApi } from '@/api/plagiarismApi';
 import { LoadingState } from '@/components/common';
 import DocumentsTab from '@/pages/workspace/DocumentsTab';
@@ -25,10 +26,11 @@ interface ProjectStats {
   jobCount: number;
 }
 
-// 右侧栏组件（自己管理数据获取）
+// 右侧栏组件（使用共享数据）
 export function ProjectManagementSidebar(): JSX.Element | null {
   const { selectedProjectId } = useComparisonStore();
-  const { data: projects } = useProjects();
+  const { projectsState } = useComparisonContext();
+  const projects = projectsState.data;
   const [projectStats, setProjectStats] = useState<Record<number, ProjectStats>>({});
 
   // 加载项目统计数据
@@ -144,7 +146,15 @@ export function ProjectManagementSidebar(): JSX.Element | null {
 export default function ProjectManagementPage() {
   // ==================== 状态管理 ====================
   const { selectedProjectId, selectProject } = useComparisonStore();
-  const { data: projects, loading, reload } = useProjects();
+  const { projectsState } = useComparisonContext();
+  const { data: projects, loading, reload } = projectsState;
+
+  // Fix: Memoize filter object to prevent infinite re-renders
+  const documentFilter = useMemo(
+    () => (selectedProjectId ? { projectId: selectedProjectId } : undefined),
+    [selectedProjectId]
+  );
+  const documentState = useDocuments(documentFilter);
 
   const [form] = Form.useForm();
   const [searchText, setSearchText] = useState('');
@@ -292,7 +302,7 @@ export default function ProjectManagementPage() {
 
         {/* 文档列表 */}
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          <DocumentsTab project={selectedProject} />
+          <DocumentsTab project={selectedProject} documentState={documentState} />
         </div>
       </div>
     );

@@ -4,9 +4,13 @@
 """
 from enum import Enum
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# 项目根目录（backend 的父目录）
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 
 class MilvusMode(str, Enum):
@@ -97,7 +101,7 @@ class Settings(BaseSettings):
     cors_allow_credentials: bool = Field(default=False, description="是否允许携带凭据")
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore"  # 忽略未定义的环境变量

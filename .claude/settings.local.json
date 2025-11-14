@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python test_embedding_api.py:*)",
+      "Bash(nul)",
+      "Bash(python verify_config.py:*)",
+      "Bash(powershell -Command \"[Environment]::SetEnvironmentVariable(''OPENAI_API_KEY'', $null, ''User'')\")",
+      "Bash(powershell -Command \"[Environment]::SetEnvironmentVariable(''OPENAI_API_KEY'', '''', ''User'')\")",
+      "Bash(powershell -Command \"[Environment]::GetEnvironmentVariable(''OPENAI_API_KEY'', ''User'')\")",
+      "Bash(powershell -Command \"[Environment]::GetEnvironmentVariable(''OPENAI_API_KEY'', ''Machine'')\")",
+      "Bash(powershell -Command \"$env:OPENAI_API_KEY\")",
+      "Bash(cat:*)",
+      "Bash(python debug_env.py:*)",
+      "Bash(conda env config vars unset:*)",
+      "Bash(powershell:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(python:*)",
+      "Bash(ruff check:*)",
+      "Bash(mypy:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

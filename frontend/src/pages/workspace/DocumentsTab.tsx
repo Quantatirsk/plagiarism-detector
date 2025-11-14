@@ -9,7 +9,6 @@ import { InboxOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadProps } from 'antd';
 import { plagiarismApi, type ProjectSummary, type DocumentSummary, type DocumentStatus } from '@/api/plagiarismApi';
-import { useDocuments } from '@/hooks/useData';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { DOCUMENT_STATUS_META } from '@/lib/status';
 import { useProgressTracking } from '@/hooks/useProgressTracking';
@@ -20,15 +19,20 @@ const { Dragger } = Upload;
 
 interface DocumentsTabProps {
   project: ProjectSummary;
+  documentState: {
+    data: DocumentSummary[] | null;
+    loading: boolean;
+    error: string | null;
+    reload: () => void;
+  };
 }
 
-export default function DocumentsTab({ project }: DocumentsTabProps) {
+export default function DocumentsTab({ project, documentState }: DocumentsTabProps) {
   // ==================== 状态管理 ====================
   const [uploading, setUploading] = useState(false);
   const [uploadTaskId, setUploadTaskId] = useState<string | null>(null);
   const { selectedDocumentId, selectDocument } = useWorkspaceStore();
 
-  const documentState = useDocuments({ projectId: project.id });
   const documents = documentState.data ?? [];
 
   // Progress tracking for uploads

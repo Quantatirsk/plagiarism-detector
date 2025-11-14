@@ -1,6 +1,8 @@
 """OpenAI-compatible reranker implementation."""
 from __future__ import annotations
 
+import builtins
+import contextlib
 from dataclasses import dataclass
 
 import httpx
@@ -126,7 +128,5 @@ class OpenAIRerankFunction:
 
     def __del__(self):
         """Cleanup on deletion."""
-        try:
+        with contextlib.suppress(builtins.BaseException):
             self.close()
-        except:
-            pass

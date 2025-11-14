@@ -5,21 +5,24 @@ OCR服务类 - 封装MinerU API调用
 使用同步ZIP返回模式，提供与MonkeyOCR兼容的接口。
 """
 
-import httpx
-import aiofiles
-import mimetypes
 import asyncio
-from pathlib import Path
-import logging
-import tempfile
-import os
-import shutil
-import zipfile
 import io
 import json
-from typing import Optional, Dict, cast
-from .ocr_config import ocr_config
+import logging
+import mimetypes
+import os
+import shutil
+import tempfile
+import zipfile
+from pathlib import Path
+from typing import cast
+
+import aiofiles
+import httpx
+
 from backend.infrastructure.http.async_client_manager import get_async_client
+
+from .ocr_config import ocr_config
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +31,7 @@ class OCRService:
     MinerU API服务封装类 - 异步实现
     """
 
-    def __init__(self, base_url: Optional[str] = None):
+    def __init__(self, base_url: str | None = None):
         """
         初始化OCR服务
 
@@ -51,7 +54,7 @@ class OCRService:
             logger.info(f"MinerU OCR服务已初始化: {self.base_url}")
             logger.debug(str(self.config))
 
-    async def extract_text(self, file_path: str) -> Optional[Dict]:
+    async def extract_text(self, file_path: str) -> dict | None:
         """
         从图像或PDF中提取文本 - 使用MinerU API（异步ZIP模式，带重试机制）
 
@@ -130,7 +133,7 @@ class OCRService:
             except (httpx.ReadError, httpx.ConnectError, httpx.TimeoutException) as e:
                 # 网络相关错误，可以重试
                 error_type = type(e).__name__
-                logger.warning(f"⚠️ MinerU OCR {error_type}: {str(e)}")
+                logger.warning(f"⚠️ MinerU OCR {error_type}: {e!s}")
 
                 if attempt < self.config.max_retries - 1:
                     retry_delay = self.config.retry_delay * (attempt + 1)  # 指数退避
@@ -148,7 +151,7 @@ class OCRService:
 
         return None
 
-    def extract_text_sync(self, file_path: str) -> Optional[Dict]:
+    def extract_text_sync(self, file_path: str) -> dict | None:
         """
         从图像或PDF中提取文本 - 同步版本（用于同步上下文）
 
@@ -171,7 +174,7 @@ class OCRService:
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                 future = executor.submit(run_in_thread)
                 # 使用配置的超时时间
-                return cast(Optional[Dict], future.result(timeout=self.timeout))
+                return cast("dict | None", future.result(timeout=self.timeout))
         except concurrent.futures.TimeoutError:
             logger.error(f"❌ OCR同步调用超时: {file_path} (超时时间: {self.timeout}秒)")
             return None
@@ -222,7 +225,7 @@ class OCRService:
 
         return ext_to_mime.get(file_ext, mime_type or 'application/octet-stream')
 
-    async def _parse_mineru_zip(self, zip_content: bytes, filename: str) -> Optional[Dict]:
+    async def _parse_mineru_zip(self, zip_content: bytes, filename: str) -> dict | None:
         """解析 MinerU ZIP 响应（异步版本）
 
         Args:
@@ -258,17 +261,17 @@ class OCRService:
             content_list = None
 
             if md_file.exists():
-                async with aiofiles.open(md_file, 'r', encoding='utf-8') as f:
+                async with aiofiles.open(md_file, encoding='utf-8') as f:
                     output_markdown = await f.read()
                 logger.debug(f"📄 读取 Markdown: {md_file.name}")
 
             if middle_json_file.exists():
-                async with aiofiles.open(middle_json_file, 'r', encoding='utf-8') as f:
+                async with aiofiles.open(middle_json_file, encoding='utf-8') as f:
                     json_content = await f.read()
                 logger.debug(f"📄 读取 middle.json: {middle_json_file.name}")
 
             if content_list_file.exists():
-                async with aiofiles.open(content_list_file, 'r', encoding='utf-8') as f:
+                async with aiofiles.open(content_list_file, encoding='utf-8') as f:
                     content_list = await f.read()
                 logger.debug(f"📄 读取 content_list.json: {content_list_file.name}")
 
@@ -294,7 +297,7 @@ class OCRService:
                 except Exception as cleanup_error:
                     logger.warning(f"⚠️ 清理临时文件失败: {cleanup_error}")
 
-    async def _parse_mineru_json(self, response_data: dict, filename: str) -> Optional[Dict]:
+    async def _parse_mineru_json(self, response_data: dict, filename: str) -> dict | None:
         """解析 MinerU JSON 响应（可选模式，异步）
 
         Args:

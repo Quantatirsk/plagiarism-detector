@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import os
 import tempfile
-from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel
@@ -12,6 +12,9 @@ from pydantic import BaseModel
 from backend.core.logging import get_logger
 from backend.db.models import Document, DocumentStatus
 from backend.services.detection_orchestrator import DetectionOrchestrator
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/documents", tags=["Document Library"])
@@ -169,7 +172,7 @@ async def upload_documents(
             await progress_tracker.start_task(batch_task_id)
             results = []
 
-            for index, (temp_path, placeholder) in enumerate(zip(temp_paths, placeholder_docs)):
+            for index, (temp_path, placeholder) in enumerate(zip(temp_paths, placeholder_docs, strict=False)):
                 try:
                     # Update parent task progress
                     await progress_tracker.update_progress(

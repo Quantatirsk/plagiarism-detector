@@ -11,7 +11,6 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 from ..readers.readers_base import BaseParser
 from .media_asr_service import ASRService, get_asr_service
@@ -27,7 +26,7 @@ class VideoParser(BaseParser):
     支持多种视频格式，包括电影、会议录像、教学视频等。
     """
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """
         初始化视频解析器
 
@@ -35,7 +34,7 @@ class VideoParser(BaseParser):
             api_key: 阿里云API密钥，可选
         """
         self.api_key = api_key
-        self._asr_service: Optional[ASRService] = None
+        self._asr_service: ASRService | None = None
         self.temp_dir = tempfile.gettempdir()
 
     @property
@@ -45,7 +44,7 @@ class VideoParser(BaseParser):
             self._asr_service = get_asr_service(self.api_key)
         return self._asr_service
 
-    def parse(self, file_path: str) -> Optional[str]:
+    def parse(self, file_path: str) -> str | None:
         """
         解析视频文件并提取其中的语音文字
 
@@ -100,7 +99,7 @@ class VideoParser(BaseParser):
             logger.error(f"视频解析错误 {file_path}: {e}")
             return None
 
-    def parse_with_details(self, file_path: str, options: Optional[dict] = None) -> Optional[dict]:
+    def parse_with_details(self, file_path: str, options: dict | None = None) -> dict | None:
         """
         使用详细选项解析视频文件
 
@@ -181,7 +180,7 @@ class VideoParser(BaseParser):
             logger.error(f"详细视频解析错误 {file_path}: {e}")
             return None
 
-    def extract_audio(self, video_path: str) -> Optional[str]:
+    def extract_audio(self, video_path: str) -> str | None:
         """
         从视频文件中提取音轨
 
@@ -288,7 +287,7 @@ class VideoParser(BaseParser):
             logger.error(f"音轨提取异常: {e}")
             return None
 
-    def _extract_audio_with_options(self, video_path: str, options: dict) -> Optional[str]:
+    def _extract_audio_with_options(self, video_path: str, options: dict) -> str | None:
         """
         使用选项提取音轨
 
@@ -396,7 +395,7 @@ class VideoParser(BaseParser):
 
         return text
 
-    def get_video_info(self, file_path: str) -> Optional[dict]:
+    def get_video_info(self, file_path: str) -> dict | None:
         """
         获取视频文件信息
 
@@ -489,7 +488,7 @@ class VideoParser(BaseParser):
         file_ext = Path(file_path).suffix.lower()
         return file_ext in self.get_supported_extensions()
 
-    def estimate_processing_time(self, file_path: str) -> Optional[str]:
+    def estimate_processing_time(self, file_path: str) -> str | None:
         """
         估算视频处理所需时间
 

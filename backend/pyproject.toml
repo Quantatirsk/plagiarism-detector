@@ -1,0 +1,57 @@
+[tool.ruff]
+# 排除检查的目录
+exclude = [
+    "document-skills",
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+]
+
+# 每行最大字符数
+line-length = 120
+
+# Python 版本
+target-version = "py311"
+
+[tool.ruff.lint]
+# 启用的规则集
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "UP",     # pyupgrade
+    "SIM",    # flake8-simplify
+    "RUF",    # ruff-specific rules
+    "N",      # pep8-naming
+    "TC",     # type-checking
+]
+
+# 忽略的规则
+ignore = [
+    "RUF001",  # 字符串中的中文标点符号（ambiguous-unicode-character-string）
+    "RUF002",  # 文档字符串中的中文标点符号（ambiguous-unicode-character-docstring）
+    "RUF003",  # 注释中的中文标点符号（ambiguous-unicode-character-comment）
+]
+
+[tool.mypy]
+# Mypy 类型检查配置
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # 渐进式类型检查，暂不强制
+check_untyped_defs = true
+exclude = [
+    "document-skills",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "langdetect.*",
+    "python_calamine.*",
+    "dashscope.*",
+    "mutagen.*",
+]
+ignore_missing_imports = true

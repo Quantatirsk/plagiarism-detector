@@ -19,7 +19,8 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import { ReportGenerator, type ReportConfig } from '@/components/reports/ReportGenerator';
-import { ReportViewer, exportReportToWord } from '@/components/reports/ReportViewer';
+import { ReportViewer } from '@/components/reports/ReportViewer';
+import { exportReportToWord } from '@/components/reports/reportExportUtils';
 import { useDocuments, useProjects } from '@/hooks/useData';
 import { designSystem } from '@/styles/DesignSystem';
 import { getApiUrl } from '@/config';

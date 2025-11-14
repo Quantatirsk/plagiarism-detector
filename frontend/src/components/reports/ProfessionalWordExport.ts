@@ -502,7 +502,7 @@ function createTableOfContents(hasSegmentsTable: boolean): Paragraph[] {
           color: COLORS.primary
         }),
         new TextRun({
-          text: '   管理层摘要',
+          text: ' 报告摘要',
           font: 'SimHei',
           size: 32,
           color: COLORS.text
@@ -523,7 +523,7 @@ function createTableOfContents(hasSegmentsTable: boolean): Paragraph[] {
           color: COLORS.primary
         }),
         new TextRun({
-          text: '   详细分析',
+          text: ' 详细分析',
           font: 'SimHei',
           size: 32,
           color: COLORS.text
@@ -546,7 +546,7 @@ function createTableOfContents(hasSegmentsTable: boolean): Paragraph[] {
                 color: COLORS.primary
               }),
               new TextRun({
-                text: '   高相似片段清单',
+                text: ' 相似片段清单',
                 font: 'SimHei',
                 size: 32,
                 color: COLORS.text
@@ -687,7 +687,7 @@ export async function generateProfessionalWordDocument(data: WordReportData): Pr
 
           new Paragraph({
             heading: HeadingLevel.HEADING_1,
-            children: [new TextRun('管理层摘要')]
+            children: [new TextRun('报告摘要')]
           }),
           ...markdownBlocksToParagraphs(summaryBlocks),
 

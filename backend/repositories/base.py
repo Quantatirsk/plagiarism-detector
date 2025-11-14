@@ -126,7 +126,7 @@ class InMemoryRepository(BaseRepository[T, K]):
             setattr(entity, 'id', self._next_id)
             self._next_id += 1
 
-        entity_id = cast(K, getattr(entity, 'id', self._next_id))
+        entity_id = cast('K', getattr(entity, 'id', self._next_id))
         self._storage[entity_id] = entity
 
         logger.debug("内存仓库创建实体", entity_id=entity_id)

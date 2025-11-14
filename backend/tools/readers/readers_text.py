@@ -9,10 +9,9 @@
 - Shell脚本和其他文本格式
 """
 
-from typing import Optional
-from .readers_base import BaseParser
 import logging
 
+from .readers_base import BaseParser
 
 # 配置日志记录器
 logger = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ class EnhancedTextParser(BaseParser):
     and other text-based formats commonly found in software projects.
     """
 
-    def parse(self, file_path: str) -> Optional[str]:
+    def parse(self, file_path: str) -> str | None:
         """
         Parse any text-based file with automatic encoding detection.
 
@@ -41,7 +40,7 @@ class EnhancedTextParser(BaseParser):
 
             for encoding in encodings:
                 try:
-                    with open(file_path, 'r', encoding=encoding, errors='ignore') as f:
+                    with open(file_path, encoding=encoding, errors='ignore') as f:
                         content = f.read()
                         # If we successfully read content, return it
                         if content:

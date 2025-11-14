@@ -11,8 +11,7 @@ from backend.services.service_factory import ServiceFactory
 __all__ = [
     # 基础类
     'BaseService',
-    'singleton',
-
     # 服务工厂
     'ServiceFactory',
+    'singleton',
 ]

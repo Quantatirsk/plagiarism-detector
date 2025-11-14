@@ -7,13 +7,28 @@ import { Card, Statistic, Row, Col, Button, Tag, Spin } from 'antd';
 import { FileTextOutlined, UnorderedListOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '@/store/workspaceStore';
-import { useProjects, useDocuments, useCompareJobs } from '@/hooks/useData';
-import { plagiarismApi } from '@/api/plagiarismApi';
+import { useProjects } from '@/hooks/useData';
+import { plagiarismApi, type DocumentSummary, type CompareJobSummary } from '@/api/plagiarismApi';
 import { DOCUMENT_STATUS_META, JOB_STATUS_META, fallbackStatusMeta } from '@/lib/status';
 import { designSystem } from '@/styles/DesignSystem';
 import { useState } from 'react';
 
-export default function ContextSidebar() {
+interface ContextSidebarProps {
+  documentState: {
+    data: DocumentSummary[] | null;
+    loading: boolean;
+    error: string | null;
+    reload: () => void;
+  };
+  jobsState: {
+    data: CompareJobSummary[] | null;
+    loading: boolean;
+    error: string | null;
+    reload: () => void;
+  };
+}
+
+export default function ContextSidebar({ documentState, jobsState }: ContextSidebarProps) {
   const navigate = useNavigate();
   const {
     selectedProjectId,
@@ -23,9 +38,6 @@ export default function ContextSidebar() {
   } = useWorkspaceStore();
 
   const { data: projects } = useProjects();
-  const documentState = useDocuments({ projectId: selectedProjectId ?? undefined });
-  const jobsState = useCompareJobs(selectedProjectId ?? undefined);
-
   const [loadingPairs, setLoadingPairs] = useState(false);
 
   const selectedProject = projects?.find((p) => p.id === selectedProjectId);

@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons';
 import PageLayout from '@/layout/PageLayout';
 import { useComparisonStore, type ComparisonModule } from '@/store/comparisonStore';
+import { ComparisonProvider } from '@/contexts/ComparisonContext';
 import { ProjectManagementSidebar } from './ProjectManagementPage';
 import { TaskManagementSidebar } from './TaskManagementPage';
 import { ReportCenterSidebar } from './ReportCenterPage';
@@ -138,19 +139,21 @@ export default function ComparisonSystemPage() {
   })();
 
   return (
-    <PageLayout
-      topBar={topBar}
-      leftSidebar={leftSidebar}
-      leftSidebarWidth={designSystem.sidebarSystem.leftWidth}
-      leftDefaultCollapsed={leftCollapsed}
-      onLeftCollapsedChange={setLeftCollapsed}
-      rightSidebar={rightSidebar}
-      rightDefaultCollapsed={rightCollapsed}
-      onRightCollapsedChange={setRightCollapsed}
-      bottomBar={bottomBar}
-      contentPadding={designSystem.spacing[1]}
-    >
-      <Outlet />
-    </PageLayout>
+    <ComparisonProvider>
+      <PageLayout
+        topBar={topBar}
+        leftSidebar={leftSidebar}
+        leftSidebarWidth={designSystem.sidebarSystem.leftWidth}
+        leftDefaultCollapsed={leftCollapsed}
+        onLeftCollapsedChange={setLeftCollapsed}
+        rightSidebar={rightSidebar}
+        rightDefaultCollapsed={rightCollapsed}
+        onRightCollapsedChange={setRightCollapsed}
+        bottomBar={bottomBar}
+        contentPadding={designSystem.spacing[1]}
+      >
+        <Outlet />
+      </PageLayout>
+    </ComparisonProvider>
   );
 }

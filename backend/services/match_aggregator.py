@@ -1,12 +1,15 @@
 """Aggregation helpers for grouping sentence-level matches."""
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-from backend.db.models import DocumentChunk
 from backend.services.types import SpanPayload
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from backend.db.models import DocumentChunk
 
 
 @dataclass
@@ -133,9 +136,9 @@ class MatchAggregator:
         results: list[dict[str, object]] = []
         for (left_parent, right_parent), record in self._records.items():
             from typing import cast
-            span_set: set = cast(set, record.pop("span_set"))
-            doc_span_set: set = cast(set, record.pop("doc_span_set"))
-            details = cast(list, record.pop("details"))
+            span_set: set = cast("set", record.pop("span_set"))
+            doc_span_set: set = cast("set", record.pop("doc_span_set"))
+            details = cast("list", record.pop("details"))
             spans = [
                 SpanPayload(
                     left_start=left_start,
@@ -188,7 +191,7 @@ class MatchAggregator:
                 ),
             )
             from typing import cast
-            for detail in cast(list, result["details"]):
+            for detail in cast("list", result["details"]):
                 if isinstance(detail, dict):
                     self._round_numeric_fields(
                         detail,

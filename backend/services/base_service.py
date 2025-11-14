@@ -37,7 +37,7 @@ def singleton(cls: type[T]) -> type[T]:
     SingletonWrapper.__module__ = cls.__module__
     SingletonWrapper.__doc__ = cls.__doc__
 
-    return cast(type[T], SingletonWrapper)
+    return cast('type[T]', SingletonWrapper)
 
 
 class BaseService:

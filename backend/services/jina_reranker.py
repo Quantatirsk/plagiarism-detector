@@ -1,6 +1,8 @@
 """Custom Jina AI reranker implementation that fixes pymilvus bug."""
 from __future__ import annotations
 
+import builtins
+import contextlib
 from dataclasses import dataclass
 
 import httpx
@@ -151,7 +153,5 @@ class JinaRerankFunction:
 
     def __del__(self):
         """Cleanup on deletion."""
-        try:
+        with contextlib.suppress(builtins.BaseException):
             self.close()
-        except:
-            pass

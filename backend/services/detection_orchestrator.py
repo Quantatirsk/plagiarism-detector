@@ -1,11 +1,10 @@
 """Orchestration layer for document ingestion and pairwise comparison."""
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlmodel import col, select
 
@@ -42,6 +41,9 @@ from backend.services.storage_gateway import (
 )
 from backend.services.text_processor import TextProcessor
 from backend.services.vector_storage import MilvusStorage
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 logger = get_logger(__name__)
 
@@ -202,7 +204,7 @@ class DetectionOrchestrator(BaseService):
 
         # 处理每个有效文档
         uploaded_documents: list[UploadedDocument] = []
-        for idx, (content, result) in enumerate(zip(contents, processed_results)):
+        for idx, (content, result) in enumerate(zip(contents, processed_results, strict=False)):
             original_idx = valid_indices[idx]
             file_path = file_paths[original_idx]
             resolved_path = Path(file_path)
@@ -931,7 +933,7 @@ class DetectionOrchestrator(BaseService):
         self._ensure_initialized()
         stored_groups = await self.gateway.store_match_groups(groups)
         mapping: dict[tuple[int, int], int] = {}
-        for payload, stored in zip(groups, stored_groups):
+        for payload, stored in zip(groups, stored_groups, strict=False):
             key = (payload.left_chunk_id, payload.right_chunk_id)
             if stored.id is not None:
                 mapping[key] = stored.id
@@ -1133,7 +1135,7 @@ class DetectionOrchestrator(BaseService):
                 dimension=len(vector),
                 norm=self._vector_norm(vector),
             )
-            for chunk, vector in zip(sentence_chunks, embeddings)
+            for chunk, vector in zip(sentence_chunks, embeddings, strict=False)
         ]
         await self.persist_embeddings(embedding_payloads)
 

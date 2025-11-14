@@ -1,6 +1,6 @@
 """Database models for document library and pairwise comparison workflow."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import ClassVar, Optional
 
@@ -62,8 +62,8 @@ class Project(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str | None = Field(default=None, max_length=255)
     description: str | None = Field(default=None, max_length=1024)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), nullable=False)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC), nullable=False)
 
     documents: list["Document"] = Relationship(back_populates="project")
     jobs: list["CompareJob"] = Relationship(back_populates="project")
@@ -97,8 +97,8 @@ class Document(SQLModel, table=True):
     storage_path: str | None = Field(default=None, max_length=500)
     metadata_json: dict | None = Field(default=None, sa_column=Column(JSON, nullable=True))
     error_message: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), nullable=False)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC), nullable=False)
     completed_at: datetime | None = Field(default=None)
 
     project: Project = Relationship(back_populates="documents")
@@ -127,7 +127,7 @@ class DocumentChunk(SQLModel, table=True):
     parent_chunk_id: int | None = Field(default=None, foreign_key="document_chunk.id", index=True)
     text: str = Field(sa_column=Column(Text, nullable=False))
     text_hash: str | None = Field(default=None, max_length=128)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), nullable=False)
 
     document: Document = Relationship(back_populates="chunks")
     parent_chunk: Optional["DocumentChunk"] = Relationship(
@@ -147,7 +147,7 @@ class ChunkEmbedding(SQLModel, table=True):
     model: str = Field(max_length=120, nullable=False)
     dimension: int = Field(nullable=False)
     norm: float | None = Field(default=None)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), nullable=False)
 
     chunk: DocumentChunk = Relationship(back_populates="embeddings")
 
@@ -170,8 +170,8 @@ class CompareJob(SQLModel, table=True):
         sa_column=Column(SAEnum(CompareJobStatus, name="compare_job_status"), nullable=False),
     )
     config_json: dict | None = Field(default=None, sa_column=Column(JSON, nullable=True))
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), nullable=False)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC), nullable=False)
     started_at: datetime | None = Field(default=None)
     completed_at: datetime | None = Field(default=None)
 
@@ -193,8 +193,8 @@ class ComparePair(SQLModel, table=True):
         sa_column=Column(SAEnum(ComparePairStatus, name="compare_pair_status"), nullable=False),
     )
     metrics_json: dict | None = Field(default=None, sa_column=Column(JSON, nullable=True))
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), nullable=False)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC), nullable=False)
     started_at: datetime | None = Field(default=None)
     completed_at: datetime | None = Field(default=None)
 

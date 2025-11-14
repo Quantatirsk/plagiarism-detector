@@ -141,8 +141,8 @@ async def create_pairs(
 
     try:
         job = await orchestrator.update_compare_job_status(job_id, status=CompareJobStatus.QUEUED)
-    except NoResultFound:
-        raise HTTPException(status_code=404, detail="Comparison job not found")
+    except NoResultFound as exc:
+        raise HTTPException(status_code=404, detail="Comparison job not found") from exc
 
     tuples = [(spec.left_document_id, spec.right_document_id) for spec in payload.pairs]
     pairs = await orchestrator.add_pairs_to_job(job_id, tuples)

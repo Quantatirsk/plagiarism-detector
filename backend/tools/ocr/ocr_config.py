@@ -3,7 +3,7 @@ OCR 服务配置管理
 """
 
 import os
-from typing import Optional, Any
+from typing import Any
 
 # 导入配置加载器确保环境变量已加载
 try:
@@ -20,7 +20,7 @@ class OCRConfig:
     def __init__(self) -> None:
         # MinerU 服务基础配置
         self.base_url: str = os.getenv("OCR_BASE_URL", "http://home.teea.cn:7000")
-        self.api_key: Optional[str] = os.getenv("OCR_API_KEY")  # 如果需要API Key
+        self.api_key: str | None = os.getenv("OCR_API_KEY")  # 如果需要API Key
 
         # 超时配置（单一超时设置，涵盖所有操作）
         self.timeout: int = int(os.getenv("OCR_TIMEOUT", "1200"))  # 默认20分钟
@@ -49,23 +49,23 @@ class OCRConfig:
 
         # 调试模式
         self.debug_mode: bool = os.getenv("OCR_DEBUG", "false").lower() == "true"
-    
+
     @property
     def timeout_tuple(self) -> tuple[Any, ...]:
         """获取超时配置元组（兼容性保留，MinerU 使用单一超时）"""
         return (self.timeout, self.timeout)
-    
+
     def get_headers(self) -> dict[str, Any]:
         """获取请求头"""
         headers = {
             'User-Agent': 'Refly-AI OCR Client/1.0'
         }
-        
+
         if self.api_key:
             headers['Authorization'] = f'Bearer {self.api_key}'
-        
+
         return headers
-    
+
     def validate(self) -> list[str]:
         """验证配置"""
         errors = []
@@ -99,7 +99,7 @@ class OCRConfig:
             errors.append(f"MINERU_PARSE_METHOD 必须是以下之一: {valid_parse_methods}")
 
         return errors
-    
+
     def is_file_size_valid(self, file_path: str) -> bool:
         """检查文件大小是否在限制范围内"""
         try:
@@ -107,13 +107,13 @@ class OCRConfig:
             return file_size_mb <= self.max_file_size
         except OSError:
             return False
-    
+
     def is_supported_format(self, file_path: str) -> bool:
         """检查文件格式是否支持"""
         from pathlib import Path
         file_ext = Path(file_path).suffix.lower()
         return file_ext in self.supported_extensions
-    
+
     def get_cache_config(self) -> dict[str, Any]:
         """获取缓存配置"""
         return {
@@ -121,7 +121,7 @@ class OCRConfig:
             'cache_dir': self.cache_dir,
             'ttl': self.cache_ttl
         }
-    
+
     def __str__(self) -> str:
         """配置信息字符串表示"""
         return f"""MinerU OCR Configuration:

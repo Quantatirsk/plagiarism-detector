@@ -15,7 +15,7 @@ async def health_check(
 ) -> dict[str, Any]:
     """
     健康检查
-    
+
     返回应用的基本健康状态
     """
     try:
@@ -23,7 +23,7 @@ async def health_check(
         return health_status
     except Exception as e:
         logger.error("Health check failed", error=str(e))
-        raise HTTPException(status_code=503, detail="Service unavailable")
+        raise HTTPException(status_code=503, detail="Service unavailable") from e
 
 @router.get("/ready")
 async def readiness_check(
@@ -31,7 +31,7 @@ async def readiness_check(
 ) -> dict[str, Any]:
     """
     就绪检查
-    
+
     检查所有依赖服务是否就绪
     """
     try:
@@ -49,13 +49,13 @@ async def readiness_check(
         raise
     except Exception as e:
         logger.error("Readiness check failed", error=str(e))
-        raise HTTPException(status_code=503, detail="Service not ready")
+        raise HTTPException(status_code=503, detail="Service not ready") from e
 
 @router.get("/live")
 async def liveness_check() -> dict[str, str]:
     """
     存活检查
-    
+
     简单的存活探针，用于Kubernetes等容器编排工具
     """
     return {"status": "alive"}

@@ -16,7 +16,8 @@ interface AsyncState<T> {
   error: string | null;
 }
 
-type AsyncHookReturn<T> = AsyncState<T> & { reload: () => void };
+export type AsyncHookReturn<T> = AsyncState<T> & { reload: () => void };
+export type UseDataReturn<T> = AsyncHookReturn<T>;
 
 function createInitialState<T>(): AsyncState<T> {
   return { data: null, loading: true, error: null };

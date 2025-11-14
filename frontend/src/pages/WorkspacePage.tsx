@@ -9,13 +9,13 @@
  * - 动态右侧栏（上下文信息）
  */
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Breadcrumb, Tabs } from 'antd';
 import { HomeOutlined, FolderOutlined } from '@ant-design/icons';
 import PageLayout from '@/layout/PageLayout';
 import { useWorkspaceStore } from '@/store/workspaceStore';
-import { useProjects } from '@/hooks/useData';
+import { useProjects, useDocuments, useCompareJobs } from '@/hooks/useData';
 import { designSystem } from '@/styles/DesignSystem';
 
 // 子组件（稍后实现）
@@ -43,6 +43,14 @@ export default function WorkspacePage() {
 
   // ==================== 数据加载 ====================
   const { data: projects } = useProjects();
+
+  // Fix: Memoize filter object to prevent infinite re-renders
+  const documentFilter = useMemo(
+    () => (selectedProjectId ? { projectId: selectedProjectId } : undefined),
+    [selectedProjectId]
+  );
+  const documentState = useDocuments(documentFilter);
+  const jobsState = useCompareJobs(selectedProjectId ?? undefined);
 
   // ==================== URL 同步 ====================
   // URL参数 → Store状态
@@ -125,12 +133,12 @@ export default function WorkspacePage() {
         {
           key: 'documents',
           label: '文档',
-          children: <DocumentsTab project={selectedProject} />,
+          children: <DocumentsTab project={selectedProject} documentState={documentState} />,
         },
         {
           key: 'tasks',
           label: '任务',
-          children: <TasksTab project={selectedProject} />,
+          children: <TasksTab project={selectedProject} jobsState={jobsState} />,
         },
         {
           key: 'compare',
@@ -157,7 +165,7 @@ export default function WorkspacePage() {
   );
 
   // rightSidebar: 动态上下文信息
-  const rightSidebar = <ContextSidebar />;
+  const rightSidebar = <ContextSidebar documentState={documentState} jobsState={jobsState} />;
 
   // bottomBar: 状态信息
   const bottomBar = (

@@ -66,7 +66,7 @@ class RedisRepository:
     ) -> bool:
         """
         设置缓存值
-        
+
         Args:
             key: 缓存键
             value: 缓存值
@@ -77,16 +77,10 @@ class RedisRepository:
             # 处理TTL
             ex = None
             if ttl is not None:
-                if isinstance(ttl, timedelta):
-                    ex = int(ttl.total_seconds())
-                else:
-                    ex = ttl
+                ex = int(ttl.total_seconds()) if isinstance(ttl, timedelta) else ttl
 
             # 序列化值
-            if serialize:
-                cache_value = json.dumps(value, ensure_ascii=False)
-            else:
-                cache_value = str(value)
+            cache_value = json.dumps(value, ensure_ascii=False) if serialize else str(value)
 
             # 设置缓存
             result = await self.client.set(key, cache_value, ex=ex)
@@ -106,7 +100,7 @@ class RedisRepository:
     ) -> Any:
         """
         获取缓存值
-        
+
         Args:
             key: 缓存键
             deserialize: 是否JSON反序列化
@@ -160,10 +154,7 @@ class RedisRepository:
     async def expire(self, key: str, ttl: int | timedelta) -> bool:
         """设置键的过期时间"""
         try:
-            if isinstance(ttl, timedelta):
-                seconds = int(ttl.total_seconds())
-            else:
-                seconds = ttl
+            seconds = int(ttl.total_seconds()) if isinstance(ttl, timedelta) else ttl
 
             result = await self.client.expire(key, seconds)
             logger.debug("缓存过期时间设置", key=key, ttl=seconds)
@@ -198,10 +189,7 @@ class RedisRepository:
     async def hset(self, key: str, field: str, value: Any, serialize: bool = True) -> bool:
         """设置哈希字段"""
         try:
-            if serialize:
-                cache_value = json.dumps(value, ensure_ascii=False)
-            else:
-                cache_value = str(value)
+            cache_value = json.dumps(value, ensure_ascii=False) if serialize else str(value)
 
             result = await self.client.hset(key, field, cache_value)
             logger.debug("哈希字段设置", key=key, field=field)

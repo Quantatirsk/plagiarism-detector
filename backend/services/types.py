@@ -1,9 +1,11 @@
 """Shared dataclasses used across services."""
 from __future__ import annotations
 
-from typing import Any
-from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 @dataclass(slots=True)

@@ -126,7 +126,7 @@ class MilvusStorage(BaseService):
             if self.mode == MilvusMode.LOCAL:
                 # 本地模式 - 使用MilvusClient的简化数据格式
                 data = []
-                for chunk, embedding in zip(chunks, embeddings):
+                for chunk, embedding in zip(chunks, embeddings, strict=False):
                     # MilvusClient需要vector字段和可选的metadata
                     data.append({
                         "vector": embedding,
@@ -180,7 +180,7 @@ class MilvusStorage(BaseService):
 
                 self.logger.info("Inserted embeddings (server)", count=len(chunks))
                 from typing import cast
-                return cast(int, result.insert_count)
+                return cast("int", result.insert_count)
 
         except Exception as e:
             self.logger.error("Failed to insert embeddings", mode=self.mode, error=str(e))

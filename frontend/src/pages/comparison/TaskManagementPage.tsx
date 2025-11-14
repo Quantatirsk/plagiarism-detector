@@ -11,7 +11,8 @@ import { useNavigate } from 'react-router-dom';
 import { Card, Select, Space, Empty, Statistic, Descriptions } from 'antd';
 import { FolderOutlined, CheckCircleOutlined, SyncOutlined, CloseCircleOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useComparisonStore } from '@/store/comparisonStore';
-import { useProjects } from '@/hooks/useData';
+import { useCompareJobs } from '@/hooks/useData';
+import { useComparisonContext } from '@/contexts/useComparisonContext';
 import { plagiarismApi } from '@/api/plagiarismApi';
 import TasksTab from '@/pages/workspace/TasksTab';
 import { designSystem } from '@/styles/DesignSystem';
@@ -19,7 +20,8 @@ import { designSystem } from '@/styles/DesignSystem';
 // 右侧栏组件
 export function TaskManagementSidebar() {
   const { selectedProjectId } = useComparisonStore();
-  const { data: projects } = useProjects();
+  const { projectsState } = useComparisonContext();
+  const projects = projectsState.data;
   const [taskStats, setTaskStats] = useState({
     total: 0,
     completed: 0,
@@ -121,7 +123,9 @@ export function TaskManagementSidebar() {
 export default function TaskManagementPage() {
   const navigate = useNavigate();
   const { selectedProjectId, selectProject } = useComparisonStore();
-  const { data: projects, loading: projectsLoading } = useProjects();
+  const { projectsState } = useComparisonContext();
+  const { data: projects, loading: projectsLoading } = projectsState;
+  const jobsState = useCompareJobs(selectedProjectId ?? undefined);
 
   // 如果没有项目，引导用户创建
   useEffect(() => {
@@ -175,7 +179,7 @@ export default function TaskManagementPage() {
         </Card>
       ) : (
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          <TasksTab project={selectedProject} />
+          <TasksTab project={selectedProject} jobsState={jobsState} />
         </div>
       )}
     </div>

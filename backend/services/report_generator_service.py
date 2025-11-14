@@ -6,7 +6,7 @@ import json
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from backend.models.report_models import (
     ComparisonReportData,
@@ -21,10 +21,12 @@ from backend.models.report_models import (
     ReportType,
 )
 from backend.services.base_service import BaseService, singleton
-from backend.services.llm_service import LLMService
 from backend.services.report_data_processor import ReportDataProcessor
 from backend.services.report_template_service import ReportTemplateService
 from backend.services.service_factory import ServiceFactory
+
+if TYPE_CHECKING:
+    from backend.services.llm_service import LLMService
 
 
 @singleton

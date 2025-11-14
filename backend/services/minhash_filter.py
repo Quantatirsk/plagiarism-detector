@@ -50,10 +50,12 @@ class MinHashProcessor:
 
         # Generate random hash function parameters
         np.random.seed(42)  # For reproducibility
-        a_values = np.random.randint(1, self.prime, size=self.config.num_perm)
-        b_values = np.random.randint(0, self.prime, size=self.config.num_perm)
+        # Use np.random.default_rng() which supports int64 for large values
+        rng = np.random.default_rng(42)
+        a_values = rng.integers(1, self.prime, size=self.config.num_perm, dtype=np.int64)
+        b_values = rng.integers(0, self.prime, size=self.config.num_perm, dtype=np.int64)
 
-        return list(zip(a_values.tolist(), b_values.tolist()))
+        return list(zip(a_values.tolist(), b_values.tolist(), strict=False))
 
     def _create_shingles(self, text: str) -> set[str]:
         """Create character-level n-grams (shingles) from text."""

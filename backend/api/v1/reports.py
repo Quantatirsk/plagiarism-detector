@@ -2,7 +2,8 @@
 报告生成API端点 - 支持文档、对比和项目级报告生成
 """
 import json
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
@@ -87,9 +88,10 @@ async def generate_document_report(
             # 流式响应
             async def generate() -> AsyncIterator[str]:
                 try:
-                    from typing import cast, AsyncGenerator as AG
+                    from collections.abc import AsyncGenerator as AG
+                    from typing import cast
                     generator = await report_generator.generate_report(generation_request, stream=True)
-                    async for chunk in cast(AG[str, None], generator):
+                    async for chunk in cast("AG[str, None]", generator):
                         yield f"data: {chunk}\n"
                 except Exception as e:
                     error_data = {"type": "error", "message": str(e)}
@@ -150,9 +152,10 @@ async def generate_comparison_report(
         if request.stream_response:
             async def generate() -> AsyncIterator[str]:
                 try:
-                    from typing import cast, AsyncGenerator as AG
+                    from collections.abc import AsyncGenerator as AG
+                    from typing import cast
                     generator = await report_generator.generate_report(generation_request, stream=True)
-                    async for chunk in cast(AG[str, None], generator):
+                    async for chunk in cast("AG[str, None]", generator):
                         yield f"data: {chunk}\n"
                 except Exception as e:
                     error_data = {"type": "error", "message": str(e)}
@@ -213,9 +216,10 @@ async def generate_project_report(
         if request.stream_response:
             async def generate() -> AsyncIterator[str]:
                 try:
-                    from typing import cast, AsyncGenerator as AG
+                    from collections.abc import AsyncGenerator as AG
+                    from typing import cast
                     generator = await report_generator.generate_report(generation_request, stream=True)
-                    async for chunk in cast(AG[str, None], generator):
+                    async for chunk in cast("AG[str, None]", generator):
                         yield f"data: {chunk}\n"
                 except Exception as e:
                     error_data = {"type": "error", "message": str(e)}

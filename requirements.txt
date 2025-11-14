@@ -14,7 +14,7 @@ distro==1.9.0
 ecdsa==0.19.1
 environs==9.5.0
 fastapi==0.121.2
-grpcio==1.74.0
+grpcio==1.67.1
 h11==0.16.0
 httpcore==1.0.9
 httptools==0.6.4
@@ -42,7 +42,8 @@ pycryptodome==3.23.0
 pydantic==2.11.7
 pydantic-settings==2.10.1
 pydantic_core==2.33.2
-pymilvus[model]==2.6.1
+pymilvus>=2.6.3
+pymilvus[model]==2.5.1
 pytest==7.4.3
 pytest-asyncio==0.21.1
 python-dateutil==2.9.0.post0

@@ -4,19 +4,28 @@
  * 复用 DocumentsTab 组件，添加项目选择器
  */
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Select, Space, Empty } from 'antd';
 import { FolderOutlined } from '@ant-design/icons';
 import { useComparisonStore } from '@/store/comparisonStore';
-import { useProjects } from '@/hooks/useData';
+import { useDocuments } from '@/hooks/useData';
+import { useComparisonContext } from '@/contexts/useComparisonContext';
 import DocumentsTab from '@/pages/workspace/DocumentsTab';
 import { designSystem } from '@/styles/DesignSystem';
 
 export default function DocumentManagementPage() {
   const navigate = useNavigate();
   const { selectedProjectId, selectProject } = useComparisonStore();
-  const { data: projects, loading: projectsLoading } = useProjects();
+  const { projectsState } = useComparisonContext();
+  const { data: projects, loading: projectsLoading } = projectsState;
+
+  // Fix: Memoize filter object to prevent infinite re-renders
+  const documentFilter = useMemo(
+    () => (selectedProjectId ? { projectId: selectedProjectId } : undefined),
+    [selectedProjectId]
+  );
+  const documentState = useDocuments(documentFilter);
 
   // 如果没有项目，引导用户创建
   useEffect(() => {
@@ -72,7 +81,7 @@ export default function DocumentManagementPage() {
         </Card>
       ) : (
         <div style={{ flex: 1, overflow: 'hidden' }}>
-          <DocumentsTab project={selectedProject} />
+          <DocumentsTab project={selectedProject} documentState={documentState} />
         </div>
       )}
     </div>

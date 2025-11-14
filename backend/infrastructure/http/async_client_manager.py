@@ -3,10 +3,12 @@
 提供全局单例的异步 HTTP 客户端，支持连接池复用
 """
 
-import httpx
 import asyncio
-from typing import Optional
 from contextlib import asynccontextmanager
+from typing import Optional
+
+import httpx
+
 from backend.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -16,8 +18,8 @@ class AsyncHTTPClientManager:
     """异步 HTTP 客户端管理器（单例模式）"""
 
     _instance: Optional['AsyncHTTPClientManager'] = None
-    _client: Optional[httpx.AsyncClient] = None
-    _lock: Optional[asyncio.Lock] = None
+    _client: httpx.AsyncClient | None = None
+    _lock: asyncio.Lock | None = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -84,7 +86,7 @@ class AsyncHTTPClientManager:
         self,
         method: str,
         url: str,
-        custom_timeout: Optional[httpx.Timeout] = None,
+        custom_timeout: httpx.Timeout | None = None,
         **kwargs
     ):
         """

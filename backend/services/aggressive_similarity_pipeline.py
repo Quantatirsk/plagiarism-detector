@@ -1,17 +1,21 @@
 """Aggressive similarity pipeline with simplified 3-stage processing."""
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from backend.db.models import DocumentChunk
-from backend.services.cross_encoder_service import CrossEncoderService
-from backend.services.embedding_service import EmbeddingService
 from backend.services.minhash_filter import MinHashFilterStage as MinHashService
 from backend.services.pipeline_metrics import metrics_collector
 from backend.services.types import CandidatePayload, SpanPayload
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from backend.db.models import DocumentChunk
+    from backend.services.cross_encoder_service import CrossEncoderService
+    from backend.services.embedding_service import EmbeddingService
 
 
 @dataclass
@@ -120,7 +124,7 @@ class SemanticRecallStage(PipelineStage):
         if missing_ids:
             texts = [chunks[cid].text for cid in missing_ids]
             embeddings = await embedding_service.embed_batch(texts)
-            for cid, embedding in zip(missing_ids, embeddings):
+            for cid, embedding in zip(missing_ids, embeddings, strict=False):
                 cache[cid] = embedding
         return [cache[cid] for cid in ids]
 
@@ -128,7 +132,7 @@ class SemanticRecallStage(PipelineStage):
         from typing import cast
         norms = np.linalg.norm(matrix, axis=1, keepdims=True)
         norms[norms == 0] = 1.0
-        return cast(np.ndarray, matrix / norms)
+        return cast("np.ndarray", matrix / norms)
 
 
 class MinHashFilterStage(PipelineStage):
@@ -206,13 +210,13 @@ class CrossEncoderDirectStage(PipelineStage):
                 context.left_chunks[left_id].text,
                 context.right_chunks[right_id].text,
             )
-            for (left_id, right_id) in context.candidate_states.keys()
+            for (left_id, right_id) in context.candidate_states
         ]
 
         scores = await service.score_pairs(pairs)
 
         # Update scores with cross-encoder results
-        for (key, score) in zip(context.candidate_states.keys(), scores):
+        for (key, score) in zip(context.candidate_states.keys(), scores, strict=False):
             state = context.candidate_states[key]
             state.cross_score = score
 
@@ -330,6 +334,6 @@ class AggressiveSimilarityPipeline:
         }
 
         # End pipeline metrics
-        metrics = metrics_collector.end_pipeline(len(filtered))
+        metrics_collector.end_pipeline(len(filtered))
 
         return filtered

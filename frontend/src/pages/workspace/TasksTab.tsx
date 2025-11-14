@@ -8,8 +8,7 @@ import { Card, Table, Tag, Button, message } from 'antd';
 import { PlayCircleOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
-import { plagiarismApi, type ProjectSummary, type CompareJobSummary } from '@/api/plagiarismApi';
-import { useCompareJobs, useDocuments } from '@/hooks/useData';
+import { plagiarismApi, type ProjectSummary, type CompareJobSummary, type DocumentSummary } from '@/api/plagiarismApi';
 import { useComparisonStore } from '@/store/comparisonStore';
 import { JOB_STATUS_META, fallbackStatusMeta } from '@/lib/status';
 import { useProgressTracking } from '@/hooks/useProgressTracking';
@@ -18,19 +17,36 @@ import { designSystem } from '@/styles/DesignSystem';
 
 interface TasksTabProps {
   project: ProjectSummary;
+  jobsState: {
+    data: CompareJobSummary[] | null;
+    loading: boolean;
+    error: string | null;
+    reload: () => void;
+  };
 }
 
-export default function TasksTab({ project }: TasksTabProps) {
+export default function TasksTab({ project, jobsState }: TasksTabProps) {
   // ==================== 状态管理 ====================
   const navigate = useNavigate();
   const [comparisonTaskId, setComparisonTaskId] = useState<string | null>(null);
   const [runningComparisons, setRunningComparisons] = useState(false);
+  const [documents, setDocuments] = useState<DocumentSummary[]>([]);
   const { selectedTaskId, selectTask } = useComparisonStore();
 
-  const jobsState = useCompareJobs(project.id);
-  const documentState = useDocuments({ projectId: project.id });
   const jobs = jobsState.data ?? [];
-  const documents = documentState.data ?? [];
+
+  // Load documents for stats
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        const docs = await plagiarismApi.listDocuments({ projectId: project.id });
+        setDocuments(docs);
+      } catch (error) {
+        console.error('Failed to load documents:', error);
+      }
+    };
+    loadDocuments();
+  }, [project.id]);
 
   // Progress tracking for comparisons
   const comparisonProgress = useProgressTracking(comparisonTaskId, {

@@ -3,22 +3,22 @@ PDF 解析器 - 使用 PyMuPDF
 支持同步和异步两种模式
 """
 
-from typing import Optional
-import re
 import asyncio
-import pymupdf
-from collections import defaultdict
-from .readers_base import BaseParser
-from ..ocr.ocr_service import get_ocr_service
-from .utils.para_optimizer import ParagraphOptimizer
 import logging
+import re
+from collections import defaultdict
 
+import pymupdf
+
+from ..ocr.ocr_service import get_ocr_service
+from .readers_base import BaseParser
+from .utils.para_optimizer import ParagraphOptimizer
 
 # 配置日志记录器
 logger = logging.getLogger(__name__)
 class PDFParser(BaseParser):
     """PDF 解析器"""
-    
+
     def __init__(self):
         """初始化PDF解析器和文本优化器。"""
         super().__init__()
@@ -46,7 +46,7 @@ class PDFParser(BaseParser):
 
             for page_num in range(pages_to_check):
                 page = doc[page_num]
-                
+
                 # 获取页面的文本内容
                 text = page.get_text().strip()
                 total_text_chars += len(text)
@@ -63,7 +63,7 @@ class PDFParser(BaseParser):
 
             if is_scanned:
                 logger.info(f"检测到扫描PDF：平均每页 {avg_chars_per_page:.0f} 字符, {total_image_count} 张图像")
-            
+
             return is_scanned
 
         except Exception as e:
@@ -87,7 +87,7 @@ class PDFParser(BaseParser):
                 return ""
 
             # 使用OCR服务的同步方法
-            logger.debug(f"正在使用OCR处理PDF文件...")
+            logger.debug("正在使用OCR处理PDF文件...")
             ocr_result = ocr_service.extract_text_sync(file_path)
 
             # 如果返回的是字典，提取文本内容
@@ -125,7 +125,7 @@ class PDFParser(BaseParser):
                 return ""
 
             # 使用OCR服务的异步方法
-            logger.debug(f"正在使用OCR异步处理PDF文件...")
+            logger.debug("正在使用OCR异步处理PDF文件...")
             ocr_result = await ocr_service.extract_text(file_path)
 
             # 如果返回的是字典，提取文本内容
@@ -157,13 +157,13 @@ class PDFParser(BaseParser):
             提取的文本内容
         """
         all_text = []
-        
+
         for page_num in range(len(doc)):
             page = doc[page_num]
             text = page.get_text()
             if text.strip():
                 all_text.append(text)
-        
+
         return '\n\n'.join(all_text)
 
     def _apply_paragraph_optimization(self, text: str) -> str:
@@ -178,7 +178,7 @@ class PDFParser(BaseParser):
         """
         if not self.text_optimizer:
             return text
-        
+
         try:
             return self.text_optimizer.optimize_text(text)
         except Exception as e:
@@ -197,22 +197,22 @@ class PDFParser(BaseParser):
         """
         lines = text.split('\n')
         cleaned_lines = []
-        
+
         # 简单的启发式方法：跳过重复出现的短行
         line_counts: defaultdict[str, int] = defaultdict(int)
         for line in lines:
             stripped = line.strip()
             if stripped and len(stripped) < 100:  # 只统计短行
                 line_counts[stripped] += 1
-        
+
         # 找出重复出现的行（可能是页眉页脚）
         repeated_lines = {line for line, count in line_counts.items() if count > 2}
-        
+
         for line in lines:
             stripped = line.strip()
             if stripped not in repeated_lines:
                 cleaned_lines.append(line)
-        
+
         return '\n'.join(cleaned_lines)
 
     def _remove_page_numbers(self, text: str) -> str:
@@ -233,25 +233,25 @@ class PDFParser(BaseParser):
             r'^\d+\s*/\s*\d+$',  # X/Y
             r'^-\s*\d+\s*-$',  # - X -
         ]
-        
+
         lines = text.split('\n')
         cleaned_lines = []
-        
+
         for line in lines:
             stripped = line.strip()
             is_page_number = False
-            
+
             for pattern in patterns:
                 if re.match(pattern, stripped, re.IGNORECASE):
                     is_page_number = True
                     break
-            
+
             if not is_page_number:
                 cleaned_lines.append(line)
-        
+
         return '\n'.join(cleaned_lines)
 
-    def parse(self, file_path: str, **options) -> Optional[str]:
+    def parse(self, file_path: str, **options) -> str | None:
         """
         解析PDF文件（同步方法）
 
@@ -300,7 +300,7 @@ class PDFParser(BaseParser):
             logger.error(f"解析PDF文件错误 {file_path}: {e}")
             return None
 
-    async def parse_async(self, file_path: str, **options) -> Optional[str]:
+    async def parse_async(self, file_path: str, **options) -> str | None:
         """
         异步解析PDF文件
 

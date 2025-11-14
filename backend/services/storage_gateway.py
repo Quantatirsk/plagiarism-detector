@@ -1,9 +1,9 @@
 """Storage gateway for document library and comparison workflow."""
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import delete, or_
 from sqlalchemy.exc import NoResultFound
@@ -25,6 +25,9 @@ from backend.db.models import (
     Project,
 )
 from backend.services.base_service import BaseService, singleton
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
 
 # ---------------------------------------------------------------------------
 # Data payloads

@@ -1,9 +1,8 @@
 """Comparison execution pipeline orchestrating pairwise detection."""
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from backend.core.logging import LogEvent, get_logger
 from backend.db.models import ChunkGranularity, ComparePairStatus, DocumentChunk
@@ -22,6 +21,9 @@ from backend.services.progress_tracker import ProgressTracker
 from backend.services.storage_gateway import MatchDetailCreate, MatchGroupCreate
 from backend.services.text_processor import TextProcessor
 from backend.services.types import CandidatePayload, SpanPayload
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 logger = get_logger(__name__)
 
@@ -195,7 +197,7 @@ class ComparisonService(BaseService):
             detail_payloads = [
                 self._to_detail_payload(pair.id or 0, entry, detail)
                 for entry in results
-                for detail in cast(list, entry["details"])
+                for detail in cast("list", entry["details"])
             ]
 
             await self.orchestrator.persist_match_results(pair.id or 0, group_payloads, detail_payloads)
@@ -380,33 +382,33 @@ class ComparisonService(BaseService):
     def _to_group_payload(self, pair_id: int, entry: dict[str, object]):
         return MatchGroupCreate(
             pair_id=pair_id,
-            left_chunk_id=cast(int, entry["left_chunk_id"]),
-            right_chunk_id=cast(int, entry["right_chunk_id"]),
-            final_score=cast(float | None, entry.get("final_score")),
-            semantic_score=cast(float | None, entry.get("semantic_score")),
-            cross_score=cast(float | None, entry.get("cross_score")),
-            alignment_ratio=cast(float | None, entry.get("alignment_ratio")),
-            span_count=cast(int, entry.get("span_count", 0)),
-            match_count=cast(int, entry.get("match_count", 0)),
-            paragraph_spans=cast(list[dict] | None, entry.get("paragraph_spans")),
-            document_spans=cast(list[dict] | None, entry.get("document_spans")),
+            left_chunk_id=cast("int", entry["left_chunk_id"]),
+            right_chunk_id=cast("int", entry["right_chunk_id"]),
+            final_score=cast("float | None", entry.get("final_score")),
+            semantic_score=cast("float | None", entry.get("semantic_score")),
+            cross_score=cast("float | None", entry.get("cross_score")),
+            alignment_ratio=cast("float | None", entry.get("alignment_ratio")),
+            span_count=cast("int", entry.get("span_count", 0)),
+            match_count=cast("int", entry.get("match_count", 0)),
+            paragraph_spans=cast("list[dict] | None", entry.get("paragraph_spans")),
+            document_spans=cast("list[dict] | None", entry.get("document_spans")),
         )
 
     def _to_detail_payload(self, pair_id: int, entry: dict[str, object], detail: dict[str, object]):
         return MatchDetailCreate(
-            left_chunk_id=cast(int, detail["left_chunk_id"]),
-            right_chunk_id=cast(int, detail["right_chunk_id"]),
-            final_score=cast(float | None, detail.get("final_score")),
-            semantic_score=cast(float | None, detail.get("semantic_score")),
-            cross_score=cast(float | None, detail.get("cross_score")),
-            spans=cast(list[dict] | None, detail.get("spans")),
-            group_key=cast(tuple[int, int] | None, detail.get("group_pair")) or (cast(int, entry["left_chunk_id"]), cast(int, entry["right_chunk_id"])),
+            left_chunk_id=cast("int", detail["left_chunk_id"]),
+            right_chunk_id=cast("int", detail["right_chunk_id"]),
+            final_score=cast("float | None", detail.get("final_score")),
+            semantic_score=cast("float | None", detail.get("semantic_score")),
+            cross_score=cast("float | None", detail.get("cross_score")),
+            spans=cast("list[dict] | None", detail.get("spans")),
+            group_key=cast("tuple[int, int] | None", detail.get("group_pair")) or (cast("int", entry["left_chunk_id"]), cast("int", entry["right_chunk_id"])),
         )
 
     def _build_metrics(self, groups: Sequence[dict[str, object]]) -> dict[str, object]:
         total = len(groups)
-        top_score = max((cast(float, group.get("final_score") or 0.0) for group in groups), default=0.0)
-        coverage = sum(cast(float, group.get("alignment_ratio") or 0.0) for group in groups)
+        top_score = max((cast("float", group.get("final_score") or 0.0) for group in groups), default=0.0)
+        coverage = sum(cast("float", group.get("alignment_ratio") or 0.0) for group in groups)
         return {
             "group_count": total,
             "top_score": round(top_score, 4),

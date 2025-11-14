@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 from uuid import uuid4
@@ -53,7 +53,7 @@ class ProgressTask:
         self.progress_percent = 0.0
         self.parent_id = parent_id
         self.metadata = metadata or {}
-        self.created_at = datetime.now(timezone.utc)
+        self.created_at = datetime.now(UTC)
         self.started_at: datetime | None = None
         self.completed_at: datetime | None = None
         self.error_message: str | None = None
@@ -63,7 +63,7 @@ class ProgressTask:
         # 额外的进度信息
         self.items_per_second: float | None = None
         self.estimated_seconds_remaining: float | None = None
-        self.last_update_time: datetime = datetime.now(timezone.utc)
+        self.last_update_time: datetime = datetime.now(UTC)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -92,7 +92,7 @@ class ProgressTask:
         """Calculate task duration in seconds."""
         if not self.started_at:
             return None
-        end_time = self.completed_at or datetime.now(timezone.utc)
+        end_time = self.completed_at or datetime.now(UTC)
         return (end_time - self.started_at).total_seconds()
 
     def calculate_duration(self) -> float | None:
@@ -171,7 +171,7 @@ class ProgressTracker(BaseService):
 
         task = self._tasks[task_id]
         task.status = ProgressStatus.RUNNING
-        task.started_at = datetime.now(timezone.utc)
+        task.started_at = datetime.now(UTC)
 
         logger.info(
             "progress_task_started",
@@ -209,7 +209,7 @@ class ProgressTracker(BaseService):
             task.current_message = message
 
         # 计算速度和剩余时间
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         time_elapsed = (now - task.last_update_time).total_seconds()
 
         if time_elapsed > 0 and task.started_at and current_step is not None and task.current_step > 0:
@@ -246,7 +246,7 @@ class ProgressTracker(BaseService):
 
         task = self._tasks[task_id]
         task.status = ProgressStatus.COMPLETED
-        task.completed_at = datetime.now(timezone.utc)
+        task.completed_at = datetime.now(UTC)
         task.progress_percent = 100.0
 
         if message:
@@ -275,7 +275,7 @@ class ProgressTracker(BaseService):
 
         task = self._tasks[task_id]
         task.status = ProgressStatus.FAILED
-        task.completed_at = datetime.now(timezone.utc)
+        task.completed_at = datetime.now(UTC)
         task.error_message = error_message
 
         logger.error(
@@ -302,7 +302,7 @@ class ProgressTracker(BaseService):
 
         task = self._tasks[task_id]
         task.status = ProgressStatus.CANCELLED
-        task.completed_at = datetime.now(timezone.utc)
+        task.completed_at = datetime.now(UTC)
 
         logger.info(
             "progress_task_cancelled",
@@ -366,7 +366,7 @@ class ProgressTracker(BaseService):
             raise ValueError(f"Task {task_id} not found")
 
         from typing import cast
-        return cast(bool, await self._task_futures[task_id])
+        return cast("bool", await self._task_futures[task_id])
 
     def subscribe_task(self, task_id: str) -> asyncio.Queue:
         """Subscribe to updates for a specific task."""
@@ -434,7 +434,7 @@ class ProgressTracker(BaseService):
         """Clean up old completed tasks."""
         self._ensure_initialized()
 
-        cutoff_time = datetime.now(timezone.utc)
+        cutoff_time = datetime.now(UTC)
         cutoff_seconds = older_than_hours * 3600
 
         tasks_to_remove = []

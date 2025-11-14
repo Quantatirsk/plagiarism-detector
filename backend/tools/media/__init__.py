@@ -18,10 +18,10 @@ class MediaService:
     统一的媒体服务接口，整合音频、视频处理功能
     """
 
-    def __init__(self, api_key: Optional[str] = None):
-        self.asr_service: Optional[ASRService] = None
-        self.audio_parser: Optional[AudioParser] = None
-        self.video_parser: Optional[VideoParser] = None
+    def __init__(self, api_key: str | None = None):
+        self.asr_service: ASRService | None = None
+        self.audio_parser: AudioParser | None = None
+        self.video_parser: VideoParser | None = None
         self.api_key = api_key
         self._init_services()
 
@@ -86,7 +86,7 @@ class MediaService:
 # 单例实例
 _media_service_instance = None
 
-def get_media_service(api_key: Optional[str] = None) -> MediaService:
+def get_media_service(api_key: str | None = None) -> MediaService:
     """
     获取媒体服务单例实例
 

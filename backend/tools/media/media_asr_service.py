@@ -13,7 +13,6 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Optional
 
 # 配置日志记录器
 logger = logging.getLogger(__name__)
@@ -34,7 +33,7 @@ class ASRService:
     阿里百炼自动语音识别服务封装类
     """
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """
         初始化ASR服务
 
@@ -63,7 +62,7 @@ class ASRService:
             '.mov', '.mkv', '.wmv', '.flv'
         }
 
-    def _recognize_file_sync(self, file_path: str, language: str = 'zh') -> Optional[str]:
+    def _recognize_file_sync(self, file_path: str, language: str = 'zh') -> str | None:
         """
         同步方法：识别音频文件中的语音并转换为文字（内部使用）
 
@@ -146,7 +145,7 @@ class ASRService:
             logger.info(f"语音识别异常 {file_path}: {e}")
             return None
 
-    async def recognize_file(self, file_path: str, language: str = 'zh') -> Optional[str]:
+    async def recognize_file(self, file_path: str, language: str = 'zh') -> str | None:
         """
         识别音频文件中的语音并转换为文字
 
@@ -160,7 +159,7 @@ class ASRService:
         # 在线程池中执行同步的 dashscope SDK 调用
         return await asyncio.to_thread(self._recognize_file_sync, file_path, language)
 
-    def _recognize_file_advanced_sync(self, file_path: str, options: Optional[dict] = None) -> Optional[dict]:
+    def _recognize_file_advanced_sync(self, file_path: str, options: dict | None = None) -> dict | None:
         """
         高级语音识别功能，返回详细信息
 
@@ -285,7 +284,7 @@ class ASRService:
             logger.info(f"高级语音识别异常 {file_path}: {e}")
             return None
 
-    async def recognize_file_advanced(self, file_path: str, options: Optional[dict] = None) -> Optional[dict]:
+    async def recognize_file_advanced(self, file_path: str, options: dict | None = None) -> dict | None:
         """
         高级语音识别功能，返回详细信息
 
@@ -299,7 +298,7 @@ class ASRService:
         # 在线程池中执行同步的 dashscope SDK 调用
         return await asyncio.to_thread(self._recognize_file_advanced_sync, file_path, options)
 
-    async def batch_recognize(self, file_paths: list[str], language: str = 'zh') -> dict[str, Optional[str]]:
+    async def batch_recognize(self, file_paths: list[str], language: str = 'zh') -> dict[str, str | None]:
         """
         批量识别多个音频文件
 
@@ -366,7 +365,7 @@ class ASRService:
         file_ext = Path(file_path).suffix.lower()
         return file_ext in self.supported_formats
 
-    def get_file_info(self, file_path: str) -> Optional[dict]:
+    def get_file_info(self, file_path: str) -> dict | None:
         """
         获取音频文件信息
 
@@ -435,7 +434,7 @@ class ASRService:
 # 全局ASR服务实例（单例模式）
 _asr_service = None
 
-def get_asr_service(api_key: Optional[str] = None) -> ASRService:
+def get_asr_service(api_key: str | None = None) -> ASRService:
     """
     获取全局ASR服务实例（单例模式）
 
@@ -450,7 +449,7 @@ def get_asr_service(api_key: Optional[str] = None) -> ASRService:
         _asr_service = ASRService(api_key)
     return _asr_service
 
-async def asr_recognize_file(file_path: str, language: str = 'zh') -> Optional[str]:
+async def asr_recognize_file(file_path: str, language: str = 'zh') -> str | None:
     """
     便捷函数：识别音频文件
 

@@ -38,7 +38,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             process_time = time.time() - start_time
             response.headers["X-Process-Time"] = str(process_time)
 
-            return cast(Response, response)
+            return cast("Response", response)
 
         except BaseApplicationError as e:
             # 处理自定义应用异常
@@ -137,7 +137,7 @@ class RequestValidationMiddleware(BaseHTTPMiddleware):
 
         # 继续处理请求
         response = await call_next(request)
-        return cast(Response, response)
+        return cast("Response", response)
 
 
 class CORSMiddleware(BaseHTTPMiddleware):
@@ -170,7 +170,7 @@ class CORSMiddleware(BaseHTTPMiddleware):
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "*"
 
-        return cast(Response, response)
+        return cast("Response", response)
 
 
 # 简单的错误处理函数 - 遵循Linus原则

@@ -39,7 +39,10 @@ async def lifespan(app: FastAPI):
         "Starting application",
         version=settings.version,
         mode=settings.milvus_mode,
-        api_prefix=settings.api_v1_prefix
+        api_prefix=settings.api_v1_prefix,
+        openai_api_key_prefix=settings.openai_api_key[:20] if settings.openai_api_key else "NOT_SET",
+        openai_base_url=settings.openai_base_url,
+        embedding_model=settings.embedding_model
     )
 
     # 初始化资源

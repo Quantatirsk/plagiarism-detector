@@ -1,12 +1,16 @@
 """Project management APIs for grouping document comparisons."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.core.logging import get_logger
-from backend.db.models import CompareJob, CompareJobStatus, Project
 from backend.services.detection_orchestrator import DetectionOrchestrator
+
+if TYPE_CHECKING:
+    from backend.db.models import CompareJob, CompareJobStatus, Project
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/projects", tags=["Projects"])

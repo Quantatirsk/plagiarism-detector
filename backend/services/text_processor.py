@@ -249,10 +249,7 @@ class TextProcessor(BaseService):
                 if not is_chinese:
                     # 英文：在中点附近找空格
                     space_idx = remaining.rfind(' ', 0, mid_point)
-                    if space_idx > 0:
-                        best_split = space_idx + 1
-                    else:
-                        best_split = mid_point
+                    best_split = space_idx + 1 if space_idx > 0 else mid_point
                 else:
                     # 中文：直接在中点分割
                     best_split = mid_point
@@ -293,7 +290,7 @@ class TextProcessor(BaseService):
         if cached_result is not None:
             self.logger.debug(f"段落分割结果从缓存返回: {cache_key[:8]}...")
             from typing import cast
-            return cast(list[tuple[str, int, int]], cached_result)
+            return cast("list[tuple[str, int, int]]", cached_result)
 
         segments: list[tuple[str, int, int]] = []
         # 使用单换行符分割段落
@@ -386,7 +383,7 @@ class TextProcessor(BaseService):
         if cached_result is not None:
             self.logger.debug(f"句子分割结果从缓存返回: {cache_key[:8]}...")
             from typing import cast
-            return cast(list[tuple[str, int, int]], cached_result)
+            return cast("list[tuple[str, int, int]]", cached_result)
 
         # 按单个换行符分割成行
         lines = text.split('\n')
@@ -401,10 +398,7 @@ class TextProcessor(BaseService):
                 # 检测这一行的语言
                 lang = self.detect_language(line_stripped)
 
-                if lang == "zh":
-                    actual_min_length = max(min_length, 20)
-                else:
-                    actual_min_length = max(min_length, 40)
+                actual_min_length = max(min_length, 20) if lang == "zh" else max(min_length, 40)
 
                 # 选择合适的模型
                 if lang == "zh" and self.nlp_zh:
@@ -545,8 +539,8 @@ class TextProcessor(BaseService):
         from typing import cast
         self.logger.info(
             f"批量处理了 {len(texts)} 个文档，"
-            f"共 {sum(cast(int, r['paragraph_count']) for r in results)} 个段落，"
-            f"{sum(cast(int, r['sentence_count']) for r in results)} 个句子"
+            f"共 {sum(cast('int', r['paragraph_count']) for r in results)} 个段落，"
+            f"{sum(cast('int', r['sentence_count']) for r in results)} 个句子"
         )
         return results
 
