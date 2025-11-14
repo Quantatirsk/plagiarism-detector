@@ -81,9 +81,8 @@ class HealthService(BaseService):
                 # 本地模式 - 检查文件是否可访问
                 from pymilvus import MilvusClient
                 client = MilvusClient(self.settings.milvus_db_file)
-                # 尝试列出集合
-                client.list_collections()  # 只是检查是否能连接
-                return True
+                collections = client.list_collections()
+                return collections is not None
             else:
                 # 服务器模式 - 检查连接
                 from pymilvus import connections

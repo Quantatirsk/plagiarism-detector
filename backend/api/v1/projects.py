@@ -7,10 +7,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.core.logging import get_logger
+from backend.db.models import CompareJobStatus
 from backend.services.detection_orchestrator import DetectionOrchestrator
-
-if TYPE_CHECKING:
-    from backend.db.models import CompareJob, CompareJobStatus, Project
+from backend.db.models import CompareJob, Project
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/projects", tags=["Projects"])
