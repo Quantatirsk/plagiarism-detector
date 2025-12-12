@@ -4,43 +4,43 @@
 单一职责：定义文件扩展名到解析器的映射关系
 符合 Linux 哲学：配置与代码分离
 """
-from typing import Any
+from typing import Union
 
 # 专用解析器映射（优先级高）
 SPECIALIZED_PARSERS = {
     # 文档格式 - 有专门的二进制解析器
-    '.pdf': ('backend.tools.readers.readers_pdf', 'PDFParser'),
-    '.docx': ('backend.tools.readers.readers_docx', 'DOCXParser'),
-    '.doc': ('backend.tools.readers.readers_doc', 'DOCParser'),
-
+    '.pdf': ('tools.readers.readers_pdf', 'PDFParser'),
+    '.docx': ('tools.readers.readers_docx', 'DOCXParser'),
+    '.doc': ('tools.readers.readers_doc', 'DOCParser'),
+    
     # Excel 格式 - 统一解析器支持多种格式
-    '.xlsx': ('backend.tools.readers.readers_excel', 'ExcelParser'),
-    '.xls': ('backend.tools.readers.readers_excel', 'ExcelParser'),
-    '.xlsb': ('backend.tools.readers.readers_excel', 'ExcelParser'),
-    '.ods': ('backend.tools.readers.readers_excel', 'ExcelParser'),
-
+    '.xlsx': ('tools.readers.readers_excel', 'ExcelParser'),
+    '.xls': ('tools.readers.readers_excel', 'ExcelParser'),
+    '.xlsb': ('tools.readers.readers_excel', 'ExcelParser'),
+    '.ods': ('tools.readers.readers_excel', 'ExcelParser'),
+    
     # 结构化数据 - 需要特殊处理
-    '.json': ('backend.tools.readers.readers_json', 'JSONParser'),
-    '.csv': ('backend.tools.readers.readers_csv', 'CSVParser'),
-
+    '.json': ('tools.readers.readers_json', 'JSONParser'),
+    '.csv': ('tools.readers.readers_csv', 'CSVParser'),
+    
     # 图像格式 - 二进制文件
-    '.png': ('backend.tools.readers.readers_image', 'ImageParser'),
-    '.jpg': ('backend.tools.readers.readers_image', 'ImageParser'),
-    '.jpeg': ('backend.tools.readers.readers_image', 'ImageParser'),
-    '.bmp': ('backend.tools.readers.readers_image', 'ImageParser'),
-    '.tiff': ('backend.tools.readers.readers_image', 'ImageParser'),
-    '.gif': ('backend.tools.readers.readers_image', 'ImageParser'),
-    '.webp': ('backend.tools.readers.readers_image', 'ImageParser'),
-
+    '.png': ('tools.readers.readers_image', 'ImageParser'),
+    '.jpg': ('tools.readers.readers_image', 'ImageParser'),
+    '.jpeg': ('tools.readers.readers_image', 'ImageParser'),
+    '.bmp': ('tools.readers.readers_image', 'ImageParser'),
+    '.tiff': ('tools.readers.readers_image', 'ImageParser'),
+    '.gif': ('tools.readers.readers_image', 'ImageParser'),
+    '.webp': ('tools.readers.readers_image', 'ImageParser'),
+    
     # 媒体格式（可选）
-    '.mp3': ('backend.tools.media.media_audio_parser', 'AudioParser'),
-    '.wav': ('backend.tools.media.media_audio_parser', 'AudioParser'),
-    '.m4a': ('backend.tools.media.media_audio_parser', 'AudioParser'),
-    '.flac': ('backend.tools.media.media_audio_parser', 'AudioParser'),
-    '.mp4': ('backend.tools.media.media_video_parser', 'VideoParser'),
-    '.avi': ('backend.tools.media.media_video_parser', 'VideoParser'),
-    '.mov': ('backend.tools.media.media_video_parser', 'VideoParser'),
-    '.mkv': ('backend.tools.media.media_video_parser', 'VideoParser'),
+    '.mp3': ('tools.media.media_audio_parser', 'AudioParser'),
+    '.wav': ('tools.media.media_audio_parser', 'AudioParser'),
+    '.m4a': ('tools.media.media_audio_parser', 'AudioParser'),
+    '.flac': ('tools.media.media_audio_parser', 'AudioParser'),
+    '.mp4': ('tools.media.media_video_parser', 'VideoParser'),
+    '.avi': ('tools.media.media_video_parser', 'VideoParser'),
+    '.mov': ('tools.media.media_video_parser', 'VideoParser'),
+    '.mkv': ('tools.media.media_video_parser', 'VideoParser'),
 }
 
 # 文本解析器支持的格式
@@ -48,7 +48,7 @@ SPECIALIZED_PARSERS = {
 TEXT_PARSER_FORMATS = [
     # ========== 基本文本文件 ==========
     '.txt', '.text', '.md', '.markdown', '.rst', '.rtf',
-
+    
     # ========== 编程语言 ==========
     # Python
     '.py', '.pyx', '.pyi', '.pyw',
@@ -121,7 +121,7 @@ TEXT_PARSER_FORMATS = [
     '.proto',  # Protocol Buffers
     '.thrift',  # Apache Thrift
     '.graphql', '.gql',  # GraphQL
-
+    
     # ========== Web 技术 ==========
     '.html', '.htm', '.xhtml', '.shtml',
     '.css', '.scss', '.sass', '.less', '.styl',
@@ -132,7 +132,7 @@ TEXT_PARSER_FORMATS = [
     '.ejs', '.erb', '.haml', '.jade', '.pug',
     '.mustache', '.hbs', '.handlebars',
     '.twig', '.liquid',
-
+    
     # ========== 配置文件 ==========
     '.json', '.jsonc', '.json5',
     '.yaml', '.yml',
@@ -159,14 +159,14 @@ TEXT_PARSER_FORMATS = [
     '.gemrc', '.rvmrc', '.ruby-version',
     '.pythonrc', '.pypirc',
     '.cargo', '.rustfmt.toml',
-
+    
     # ========== 构建文件 ==========
     '.make', '.am', '.in',
     '.pro', '.pri', '.qml',
     '.vcxproj', '.vcproj', '.sln', '.csproj', '.vbproj', '.fsproj',
     '.pbxproj', '.xcodeproj', '.xcworkspace',
     '.workspace', '.project',
-
+    
     # ========== 文档格式 ==========
     '.tex', '.latex', '.cls', '.sty', '.bib',
     '.pod',
@@ -176,7 +176,7 @@ TEXT_PARSER_FORMATS = [
     '.textile',
     '.asciidoc', '.adoc', '.asc',
     '.pandoc',
-
+    
     # ========== 数据格式 ==========
     '.tsv', '.tab',
     '.log',
@@ -192,7 +192,7 @@ TEXT_PARSER_FORMATS = [
     '.rubocop.yml',
     '.stylelintrc',
     '.markdownlint.json',
-
+    
     # ========== 其他文本格式 ==========
     '.readme', '.license', '.changelog', '.authors', '.contributors',
     '.todo', '.fixme',
@@ -235,69 +235,69 @@ EXTENSIONLESS_TEXT_FILES = [
     'dependencies',
 ]
 
-def get_parser_map() -> Any:
+def get_parser_map():
     """
     获取完整的解析器映射
-
+    
     Returns:
         dict: 文件扩展名到解析器的映射
     """
     parser_map = {}
-
+    
     # 1. 先添加文本解析器（默认）
     for ext in TEXT_PARSER_FORMATS:
-        parser_map[ext.lower()] = ('backend.tools.readers.readers_text', 'EnhancedTextParser')
-
+        parser_map[ext.lower()] = ('tools.readers.readers_text', 'EnhancedTextParser')
+    
     # 2. 覆盖专用解析器（优先级更高）
     parser_map.update(SPECIALIZED_PARSERS)
-
+    
     return parser_map
 
-def is_extensionless_text_file(filename: str) -> Any:
+def is_extensionless_text_file(filename):
     """
     检查是否是无扩展名的文本文件
-
+    
     Args:
         filename: 文件名（不含路径）
-
+        
     Returns:
         bool: 是否是已知的无扩展名文本文件
     """
     return filename.lower() in EXTENSIONLESS_TEXT_FILES
 
-def get_parser_for_file(file_path: str) -> Any:
+def get_parser_for_file(file_path):
     """
     根据文件路径获取合适的解析器
-
+    
     Args:
         file_path: 文件路径
-
+        
     Returns:
         tuple: (module_path, class_name) 或 None
     """
     from pathlib import Path
-
+    
     path = Path(file_path)
     ext = path.suffix.lower()
     name = path.name.lower()
-
+    
     # 1. 先检查扩展名
     parser_map = get_parser_map()
     if ext in parser_map:
         return parser_map[ext]
-
+    
     # 2. 检查无扩展名文件
     if not ext and is_extensionless_text_file(name):
-        return ('backend.tools.readers.readers_text', 'EnhancedTextParser')
-
+        return ('tools.readers.readers_text', 'EnhancedTextParser')
+    
     return None
 
 # 统计信息
-def get_format_stats() -> Any:
+def get_format_stats():
     """获取格式支持的统计信息"""
     parser_map = get_parser_map()
-
-    stats: dict[str, int | dict[str, int]] = {
+    
+    stats: dict[str, Union[int, dict[str, int]]] = {
         'total': len(parser_map),
         'text_formats': len(TEXT_PARSER_FORMATS),
         'specialized_formats': len(SPECIALIZED_PARSERS),
@@ -313,5 +313,5 @@ def get_format_stats() -> Any:
         by_parser[key].append(ext)
 
     stats['by_parser'] = {k: len(v) for k, v in by_parser.items()}
-
+    
     return stats

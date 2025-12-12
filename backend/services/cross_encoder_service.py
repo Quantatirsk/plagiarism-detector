@@ -5,12 +5,11 @@ import asyncio
 import hashlib
 from collections import OrderedDict
 from time import time
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from backend.services.base_service import BaseService, singleton
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
+from collections.abc import Sequence
 
 PairText = tuple[str, str]
 

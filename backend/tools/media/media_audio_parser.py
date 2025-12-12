@@ -8,7 +8,7 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Optional
 
 from ..readers.readers_base import BaseParser
 from .media_asr_service import ASRService, get_asr_service
@@ -23,7 +23,7 @@ class AudioParser(BaseParser):
     支持多种音频格式，包括录音、播客、会议音频等。
     """
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: Optional[str] = None):
         """
         初始化音频解析器
 
@@ -31,7 +31,7 @@ class AudioParser(BaseParser):
             api_key: 阿里云API密钥，可选
         """
         self.api_key = api_key
-        self._asr_service: ASRService | None = None
+        self._asr_service: Optional[ASRService] = None
 
     @property
     def asr_service(self):
@@ -40,7 +40,7 @@ class AudioParser(BaseParser):
             self._asr_service = get_asr_service(self.api_key)
         return self._asr_service
 
-    def parse(self, file_path: str) -> str | None:
+    def parse(self, file_path: str) -> Optional[str]:
         """
         使用ASR解析音频文件并提取文字
 
@@ -79,7 +79,7 @@ class AudioParser(BaseParser):
             logger.error(f"音频解析错误 {file_path}: {e}")
             return None
 
-    def parse_with_details(self, file_path: str, options: dict | None = None) -> dict | None:
+    def parse_with_details(self, file_path: str, options: Optional[dict] = None) -> Optional[dict]:
         """
         使用详细选项解析音频文件
 
@@ -101,10 +101,7 @@ class AudioParser(BaseParser):
             logger.debug(f"开始详细语音识别: {file_path}")
 
             # 使用高级ASR服务
-            result = cast(
-                "dict | None",
-                asyncio.run(self.asr_service.recognize_file_advanced(file_path, options))
-            )
+            result = asyncio.run(self.asr_service.recognize_file_advanced(file_path, options))
 
             if result:
                 # 添加文件信息
@@ -122,7 +119,7 @@ class AudioParser(BaseParser):
             logger.error(f"详细音频解析错误 {file_path}: {e}")
             return None
 
-    def batch_parse(self, file_paths: list[str], language: str = 'zh') -> dict[str, str | None]:
+    def batch_parse(self, file_paths: list[str], language: str = 'zh') -> dict[str, Optional[str]]:
         """
         批量解析多个音频文件
 
@@ -146,7 +143,7 @@ class AudioParser(BaseParser):
             results = asyncio.run(self.asr_service.batch_recognize(supported_files, language))
 
             # 清理结果
-            cleaned_results: dict[str, str | None] = {}
+            cleaned_results: dict[str, Optional[str]] = {}
             for file_path, text in results.items():
                 if text:
                     cleaned_results[file_path] = self._clean_extracted_text(text)
@@ -185,7 +182,7 @@ class AudioParser(BaseParser):
 
         return text
 
-    def get_audio_info(self, file_path: str) -> dict | None:
+    def get_audio_info(self, file_path: str) -> Optional[dict]:
         """
         获取音频文件信息
 
@@ -196,12 +193,12 @@ class AudioParser(BaseParser):
             音频信息字典，失败返回None
         """
         try:
-            return cast("dict | None", self.asr_service.get_file_info(file_path))
+            return self.asr_service.get_file_info(file_path)
         except Exception as e:
             logger.error(f"获取音频信息错误 {file_path}: {e}")
             return None
 
-    def estimate_recognition_time(self, file_path: str) -> str | None:
+    def estimate_recognition_time(self, file_path: str) -> Optional[str]:
         """
         估算语音识别所需时间
 

@@ -112,7 +112,7 @@ class MilvusStorage(BaseService):
             "index_type": "HNSW",
             "params": {"M": 16, "efConstruction": 200}
         }
-        collection.create_index("embedding", index_params)
+        _ = collection.create_index("embedding", index_params)
         self.logger.info("Created server collection with index", name=self.collection_name)
 
     async def insert_embeddings(
@@ -279,7 +279,7 @@ class MilvusStorage(BaseService):
                     self.client.drop_collection(self.collection_name)
             else:
                 from pymilvus import utility
-                utility.drop_collection(self.collection_name)
+                _ = utility.drop_collection(self.collection_name)
             self.logger.info("Dropped collection", name=self.collection_name)
         except Exception as e:
             self.logger.error("Failed to drop collection", error=str(e))

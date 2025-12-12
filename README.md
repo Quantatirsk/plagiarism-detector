@@ -4,8 +4,8 @@
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.116.1-green)
-![React](https://img.shields.io/badge/React-19.1-61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6)
+![React](https://img.shields.io/badge/React-18.3-61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6)
 ![Milvus](https://img.shields.io/badge/Milvus-2.5%2B-orange)
 ![spaCy](https://img.shields.io/badge/spaCy-3.7%2B-09A3D5)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
@@ -47,7 +47,7 @@
 
 ### 前端
 
-- **React 19.1** + **TypeScript 5.7** - 类型安全的现代前端框架
+- **React 18.3** + **TypeScript 5.8** - 类型安全的现代前端框架
 - **Vite** - 极速的开发构建工具
 - **Tailwind CSS** - 实用优先的 CSS 框架
 - **Radix UI** - 无障碍的 UI 组件库

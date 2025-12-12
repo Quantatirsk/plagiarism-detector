@@ -13,19 +13,19 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Optional, Any, cast
 
 # 配置日志记录器
 logger = logging.getLogger(__name__)
 try:
-    import dashscope  # type: ignore
-    from dashscope.audio.asr import Recognition, RecognitionCallback, RecognitionResult  # type: ignore
+    import dashscope
+    from dashscope.audio.asr import Recognition, RecognitionCallback
     dashscope_available = True
 except ImportError as e:
     logger.error(f"Warning: dashscope import error: {e}")
     dashscope = None
     Recognition = None
     RecognitionCallback = None
-    RecognitionResult = None
     dashscope_available = False
 
 class ASRService:
@@ -33,7 +33,7 @@ class ASRService:
     阿里百炼自动语音识别服务封装类
     """
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: Optional[str] = None):
         """
         初始化ASR服务
 
@@ -62,7 +62,7 @@ class ASRService:
             '.mov', '.mkv', '.wmv', '.flv'
         }
 
-    def _recognize_file_sync(self, file_path: str, language: str = 'zh') -> str | None:
+    def _recognize_file_sync(self, file_path: str, language: str = 'zh') -> Optional[str]:
         """
         同步方法：识别音频文件中的语音并转换为文字（内部使用）
 
@@ -89,9 +89,11 @@ class ASRService:
             logger.debug(f"开始识别音频文件: {file_path}")
 
             # 使用Recognition进行实时识别
-            class ASRCallback(RecognitionCallback):  # type: ignore[misc, valid-type]
-                def __init__(self) -> None:
-                    self.full_text = []
+            callback_base = cast(Any, RecognitionCallback)
+
+            class ASRCallback(callback_base):
+                def __init__(self):
+                    self.full_text: list[str] = []
 
                 def on_open(self) -> None:
                     pass
@@ -99,10 +101,10 @@ class ASRService:
                 def on_complete(self) -> None:
                     pass
 
-                def on_error(self, result: RecognitionResult) -> None:  # type: ignore[valid-type]
+                def on_error(self, result: Any) -> None:
                     logger.error(f"识别错误: {result}")
 
-                def on_event(self, result: RecognitionResult) -> None:  # type: ignore[valid-type]
+                def on_event(self, result: Any) -> None:
                     # 收集识别结果
                     if result.get_sentence():
                         sentence = result.get_sentence()
@@ -116,7 +118,7 @@ class ASRService:
             format_name = file_ext[1:] if file_ext else 'mp3'
 
             # 创建识别实例
-            recognition = Recognition(  # type: ignore[misc]
+            recognition = cast(Any, Recognition)(
                 model='paraformer-realtime-v2',
                 format=format_name,
                 sample_rate=16000,
@@ -145,7 +147,7 @@ class ASRService:
             logger.info(f"语音识别异常 {file_path}: {e}")
             return None
 
-    async def recognize_file(self, file_path: str, language: str = 'zh') -> str | None:
+    async def recognize_file(self, file_path: str, language: str = 'zh') -> Optional[str]:
         """
         识别音频文件中的语音并转换为文字
 
@@ -159,7 +161,7 @@ class ASRService:
         # 在线程池中执行同步的 dashscope SDK 调用
         return await asyncio.to_thread(self._recognize_file_sync, file_path, language)
 
-    def _recognize_file_advanced_sync(self, file_path: str, options: dict | None = None) -> dict | None:
+    def _recognize_file_advanced_sync(self, file_path: str, options: Optional[dict] = None) -> Optional[dict]:
         """
         高级语音识别功能，返回详细信息
 
@@ -194,11 +196,13 @@ class ASRService:
             logger.debug(f"开始高级语音识别: {file_path}")
 
             # 使用Recognition进行高级识别
-            class AdvancedASRCallback(RecognitionCallback):  # type: ignore[misc, valid-type]
-                def __init__(self) -> None:
-                    self.sentences = []
-                    self.words = []
-                    self.full_text = []
+            callback_base = cast(Any, RecognitionCallback)
+
+            class AdvancedASRCallback(callback_base):
+                def __init__(self):
+                    self.sentences: list[dict] = []
+                    self.words: list[dict] = []
+                    self.full_text: list[str] = []
 
                 def on_open(self) -> None:
                     pass
@@ -206,10 +210,10 @@ class ASRService:
                 def on_complete(self) -> None:
                     pass
 
-                def on_error(self, result: RecognitionResult) -> None:  # type: ignore[valid-type]
+                def on_error(self, result: Any) -> None:
                     logger.error(f"识别错误: {result}")
 
-                def on_event(self, result: RecognitionResult) -> None:  # type: ignore[valid-type]
+                def on_event(self, result: Any) -> None:
                     # 收集识别结果
                     if result.get_sentence():
                         sentence = result.get_sentence()
@@ -242,8 +246,8 @@ class ASRService:
             format_name = file_ext[1:] if file_ext else 'mp3'
 
             # 创建识别实例
-            recognition = Recognition(  # type: ignore[misc]
-                model='paraformer-realtime-v2',  # 使用正确的模型名称
+            recognition = cast(Any, Recognition)(
+                model='paraformer-realtime-v2',
                 format=format_name,
                 sample_rate=16000,
                 callback=callback
@@ -274,7 +278,7 @@ class ASRService:
                 recognition_result['duration'] = last_sentence.get('end_time', 0)
 
             if recognition_result['text']:
-                logger.info(f"高级语音识别成功，文字长度: {len(recognition_result['text'])} 字符")  # type: ignore[arg-type]
+                logger.info(f"高级语音识别成功，文字长度: {len(str(recognition_result['text']))} 字符")
                 return recognition_result
             else:
                 logger.warning("高级语音识别失败: 无识别结果")
@@ -284,7 +288,7 @@ class ASRService:
             logger.info(f"高级语音识别异常 {file_path}: {e}")
             return None
 
-    async def recognize_file_advanced(self, file_path: str, options: dict | None = None) -> dict | None:
+    async def recognize_file_advanced(self, file_path: str, options: Optional[dict] = None) -> Optional[dict]:
         """
         高级语音识别功能，返回详细信息
 
@@ -298,7 +302,7 @@ class ASRService:
         # 在线程池中执行同步的 dashscope SDK 调用
         return await asyncio.to_thread(self._recognize_file_advanced_sync, file_path, options)
 
-    async def batch_recognize(self, file_paths: list[str], language: str = 'zh') -> dict[str, str | None]:
+    async def batch_recognize(self, file_paths: list[str], language: str = 'zh') -> dict[str, Optional[str]]:
         """
         批量识别多个音频文件
 
@@ -365,7 +369,7 @@ class ASRService:
         file_ext = Path(file_path).suffix.lower()
         return file_ext in self.supported_formats
 
-    def get_file_info(self, file_path: str) -> dict | None:
+    def get_file_info(self, file_path: str) -> Optional[dict]:
         """
         获取音频文件信息
 
@@ -392,7 +396,7 @@ class ASRService:
             # 尝试获取音频时长（需要额外库支持）
             try:
                 import mutagen
-                audio_file = mutagen.File(file_path)  # type: ignore[attr-defined]
+                audio_file = cast(Any, mutagen).File(file_path)
                 if audio_file is not None:
                     file_info['duration'] = round(audio_file.info.length, 2)
                     file_info['duration_formatted'] = self._format_duration(audio_file.info.length)
@@ -434,7 +438,7 @@ class ASRService:
 # 全局ASR服务实例（单例模式）
 _asr_service = None
 
-def get_asr_service(api_key: str | None = None) -> ASRService:
+def get_asr_service(api_key: Optional[str] = None) -> ASRService:
     """
     获取全局ASR服务实例（单例模式）
 
@@ -449,7 +453,7 @@ def get_asr_service(api_key: str | None = None) -> ASRService:
         _asr_service = ASRService(api_key)
     return _asr_service
 
-async def asr_recognize_file(file_path: str, language: str = 'zh') -> str | None:
+async def asr_recognize_file(file_path: str, language: str = 'zh') -> Optional[str]:
     """
     便捷函数：识别音频文件
 

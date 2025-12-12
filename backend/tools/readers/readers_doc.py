@@ -5,11 +5,11 @@ Using the doc2txt library which provides a Python wrapper around antiword
 with cross-platform binary files and text optimization features.
 """
 
+from typing import Optional
+from doc2txt import extract_text
+from .readers_base import BaseParser
 import logging
 
-from doc2txt import extract_text
-
-from .readers_base import BaseParser
 
 # 配置日志记录器
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ class DOCParser(BaseParser):
     with built-in cross-platform support and text optimization.
     """
 
-    def parse(self, file_path: str) -> str | None:
+    def parse(self, file_path: str) -> Optional[str]:
         """
         Parse a DOC file and extract optimized text.
 

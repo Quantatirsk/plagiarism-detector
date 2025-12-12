@@ -5,16 +5,13 @@
 通过绕过高级API开销来实现最快的DOCX文本提取。
 """
 
-import logging
-import zipfile
-from typing import TYPE_CHECKING, cast
-
+from typing import Optional, cast
 from lxml import etree
-
+from lxml.etree import _Element
+import zipfile
 from .readers_base import BaseParser
+import logging
 
-if TYPE_CHECKING:
-    from lxml.etree import _Element
 
 # 配置日志记录器
 logger = logging.getLogger(__name__)
@@ -26,7 +23,7 @@ class DOCXParser(BaseParser):
     直接解析底层XML结构，绕过了python-docx高级API的开销。
     """
 
-    def parse(self, file_path: str) -> str | None:
+    def parse(self, file_path: str) -> Optional[str]:
         """
         通过直接从 XML 中提取文本来解析 DOCX 文件。
 
@@ -53,13 +50,13 @@ class DOCXParser(BaseParser):
                 namespace = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 
                 # 提取段落而不是单个文本节点
-                paragraphs = cast('list[_Element]', root.xpath('//w:p', namespaces=namespace))
+                paragraphs = cast(list[_Element], root.xpath('//w:p', namespaces=namespace))
 
                 # 从每个段落中提取文本
                 paragraph_texts: list[str] = []
                 for paragraph in paragraphs:
                     # 获取此段落内的所有文本节点
-                    text_nodes = cast('list[str]', paragraph.xpath('.//w:t/text()', namespaces=namespace))
+                    text_nodes = cast(list[str], paragraph.xpath('.//w:t/text()', namespaces=namespace))
                     paragraph_text = ''.join(text_nodes).strip()
 
                     if paragraph_text:  # 只添加非空段落

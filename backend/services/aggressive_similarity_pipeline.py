@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+
 
 import numpy as np
 
@@ -10,12 +10,11 @@ from backend.services.minhash_filter import MinHashFilterStage as MinHashService
 from backend.services.pipeline_metrics import metrics_collector
 from backend.services.types import CandidatePayload, SpanPayload
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
+from collections.abc import Sequence
 
-    from backend.db.models import DocumentChunk
-    from backend.services.cross_encoder_service import CrossEncoderService
-    from backend.services.embedding_service import EmbeddingService
+from backend.db.models import DocumentChunk
+from backend.services.cross_encoder_service import CrossEncoderService
+from backend.services.embedding_service import EmbeddingService
 
 
 @dataclass

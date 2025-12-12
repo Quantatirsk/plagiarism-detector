@@ -26,12 +26,13 @@
 - 方案2：在 readers_parser_map.py 中为特定格式配置
 """
 
-import logging
-import mimetypes
 import os
+import mimetypes
 from pathlib import Path
-
+from typing import Optional, List
 from .readers_base import BaseParser
+import logging
+
 
 # 配置日志记录器
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ class MetadataOnlyParser(BaseParser):
     同时可通过路径搜索功能找到文件。
     """
 
-    def parse(self, file_path: str) -> str | None:
+    def parse(self, file_path: str) -> Optional[str]:
         """
         从任何文件类型仅提取元数据。
 
@@ -81,7 +82,7 @@ class MetadataOnlyParser(BaseParser):
     # 不再需要 is_supported() - 由 readers_parser_map.py 管理
     # Linux 哲学：单一职责，只负责解析
 
-    def get_file_mime_type(self, file_path: str) -> str | None:
+    def get_file_mime_type(self, file_path: str) -> Optional[str]:
         """
         获取文件的 MIME 类型。
 
@@ -113,15 +114,21 @@ class MetadataOnlyParser(BaseParser):
             mime_type = self.get_file_mime_type(file_path)
 
             # 图像文件
-            if (mime_type and mime_type.startswith('image/')) or extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.svg', '.webp', '.ico']:
+            if mime_type and mime_type.startswith('image/'):
+                return 'image'
+            elif extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.svg', '.webp', '.ico']:
                 return 'image'
 
             # 音频文件
-            elif (mime_type and mime_type.startswith('audio/')) or extension in ['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma']:
+            elif mime_type and mime_type.startswith('audio/'):
+                return 'audio'
+            elif extension in ['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma']:
                 return 'audio'
 
             # 视频文件
-            elif (mime_type and mime_type.startswith('video/')) or extension in ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v']:
+            elif mime_type and mime_type.startswith('video/'):
+                return 'video'
+            elif extension in ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v']:
                 return 'video'
 
             # 归档/压缩文件

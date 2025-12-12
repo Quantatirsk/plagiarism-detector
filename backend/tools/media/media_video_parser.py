@@ -11,6 +11,7 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 from ..readers.readers_base import BaseParser
 from .media_asr_service import ASRService, get_asr_service
@@ -26,7 +27,7 @@ class VideoParser(BaseParser):
     支持多种视频格式，包括电影、会议录像、教学视频等。
     """
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: Optional[str] = None):
         """
         初始化视频解析器
 
@@ -34,7 +35,7 @@ class VideoParser(BaseParser):
             api_key: 阿里云API密钥，可选
         """
         self.api_key = api_key
-        self._asr_service: ASRService | None = None
+        self._asr_service: Optional[ASRService] = None
         self.temp_dir = tempfile.gettempdir()
 
     @property
@@ -44,7 +45,7 @@ class VideoParser(BaseParser):
             self._asr_service = get_asr_service(self.api_key)
         return self._asr_service
 
-    def parse(self, file_path: str) -> str | None:
+    def parse(self, file_path: str) -> Optional[str]:
         """
         解析视频文件并提取其中的语音文字
 
@@ -99,7 +100,7 @@ class VideoParser(BaseParser):
             logger.error(f"视频解析错误 {file_path}: {e}")
             return None
 
-    def parse_with_details(self, file_path: str, options: dict | None = None) -> dict | None:
+    def parse_with_details(self, file_path: str, options: Optional[dict] = None) -> Optional[dict]:
         """
         使用详细选项解析视频文件
 
@@ -165,7 +166,7 @@ class VideoParser(BaseParser):
                 if recognition_result:
                     result['text'] = recognition_result.get('text', '')
                     result['recognition_details'] = recognition_result
-                    logger.info(f"详细视频语音识别成功，文字长度: {len(result['text'])} 字符")  # type: ignore[arg-type]
+                    logger.info(f"详细视频语音识别成功，文字长度: {len(str(result['text']))} 字符")
                     return result
                 else:
                     logger.warning("详细视频语音识别失败")
@@ -180,7 +181,7 @@ class VideoParser(BaseParser):
             logger.error(f"详细视频解析错误 {file_path}: {e}")
             return None
 
-    def extract_audio(self, video_path: str) -> str | None:
+    def extract_audio(self, video_path: str) -> Optional[str]:
         """
         从视频文件中提取音轨
 
@@ -200,7 +201,7 @@ class VideoParser(BaseParser):
 
             # 方法1: 使用moviepy（推荐）
             try:
-                from moviepy.editor import VideoFileClip  # type: ignore[import-not-found]
+                from moviepy import VideoFileClip
 
                 logger.debug("使用MoviePy提取音轨...")
                 with VideoFileClip(video_path) as video:
@@ -223,7 +224,7 @@ class VideoParser(BaseParser):
             # 方法2: 使用ffmpeg-python
             if not success:
                 try:
-                    import ffmpeg  # type: ignore[import-not-found]
+                    import ffmpeg
 
                     logger.debug("使用FFmpeg提取音轨...")
                     (
@@ -287,7 +288,7 @@ class VideoParser(BaseParser):
             logger.error(f"音轨提取异常: {e}")
             return None
 
-    def _extract_audio_with_options(self, video_path: str, options: dict) -> str | None:
+    def _extract_audio_with_options(self, video_path: str, options: dict) -> Optional[str]:
         """
         使用选项提取音轨
 
@@ -395,7 +396,7 @@ class VideoParser(BaseParser):
 
         return text
 
-    def get_video_info(self, file_path: str) -> dict | None:
+    def get_video_info(self, file_path: str) -> Optional[dict]:
         """
         获取视频文件信息
 
@@ -421,7 +422,7 @@ class VideoParser(BaseParser):
 
             # 尝试获取详细视频信息
             try:
-                from moviepy.editor import VideoFileClip
+                from moviepy import VideoFileClip
 
                 with VideoFileClip(file_path) as video:
                     basic_info.update({
@@ -488,7 +489,7 @@ class VideoParser(BaseParser):
         file_ext = Path(file_path).suffix.lower()
         return file_ext in self.get_supported_extensions()
 
-    def estimate_processing_time(self, file_path: str) -> str | None:
+    def estimate_processing_time(self, file_path: str) -> Optional[str]:
         """
         估算视频处理所需时间
 
