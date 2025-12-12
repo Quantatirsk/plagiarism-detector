@@ -17,7 +17,8 @@
       "Bash(python:*)",
       "Bash(ruff check:*)",
       "Bash(mypy:*)",
-      "Bash(pip show:*)"
+      "Bash(pip show:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
