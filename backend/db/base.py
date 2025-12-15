@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from backend.core.config import get_settings
+from core.config import get_settings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -57,7 +57,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """Create database tables based on SQLModel metadata."""
     # Import models to ensure they are registered with metadata
-    from backend.db import models  # noqa: F401
+    from db import models  # noqa: F401
 
     engine = get_engine()
     async with engine.begin() as conn:

@@ -9,8 +9,8 @@ from sqlalchemy import delete, or_
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import col, select
 
-from backend.db import get_session
-from backend.db.models import (
+from db import get_session
+from db.models import (
     ChunkEmbedding,
     ChunkGranularity,
     CompareJob,
@@ -24,7 +24,7 @@ from backend.db.models import (
     MatchGroup,
     Project,
 )
-from backend.services.base_service import BaseService, singleton
+from services.base_service import BaseService, singleton
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence

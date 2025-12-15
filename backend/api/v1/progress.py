@@ -4,8 +4,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from backend.core.logging import get_logger
-from backend.services.progress_tracker import ProgressStatus, ProgressTracker, ProgressType
+from core.logging import get_logger
+from services.progress_tracker import ProgressStatus, ProgressTracker, ProgressType
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/progress", tags=["Progress"])

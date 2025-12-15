@@ -2,14 +2,14 @@ from functools import lru_cache
 
 from fastapi import Depends
 
-from backend.repositories.redis import RedisCache
-from backend.services import ServiceFactory
-from backend.services.detection_orchestrator import DetectionOrchestrator
-from backend.services.embedding_service import EmbeddingService
-from backend.services.health_service import HealthService
-from backend.services.llm_service import LLMService
-from backend.services.text_processor import TextProcessor
-from backend.services.vector_storage import MilvusStorage
+from repositories.redis import RedisCache
+from services import ServiceFactory
+from services.detection_orchestrator import DetectionOrchestrator
+from services.embedding_service import EmbeddingService
+from services.health_service import HealthService
+from services.llm_service import LLMService
+from services.text_processor import TextProcessor
+from services.vector_storage import MilvusStorage
 
 
 def get_embedding_service() -> EmbeddingService:

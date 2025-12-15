@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 from sqlmodel import col, select
 
-from backend.core.errors import DocumentParseError, EmbeddingError, StorageError
-from backend.core.logging import LogEvent, get_logger
-from backend.db import get_session
-from backend.db.models import (
+from core.errors import DocumentParseError, EmbeddingError, StorageError
+from core.logging import LogEvent, get_logger
+from db import get_session
+from db.models import (
     ChunkGranularity,
     CompareJob,
     CompareJobStatus,
@@ -24,11 +24,11 @@ from backend.db.models import (
     MatchGroup,
     Project,
 )
-from backend.services.base_service import BaseService, singleton
-from backend.services.document_parser import DocumentParser
-from backend.services.embedding_service import EmbeddingService
-from backend.services.progress_tracker import ProgressTracker, ProgressType
-from backend.services.storage_gateway import (
+from services.base_service import BaseService, singleton
+from services.document_parser import DocumentParser
+from services.embedding_service import EmbeddingService
+from services.progress_tracker import ProgressTracker, ProgressType
+from services.storage_gateway import (
     ChunkCreate,
     CompareJobCreate,
     ComparePairCreate,
@@ -39,8 +39,8 @@ from backend.services.storage_gateway import (
     ProjectCreate,
     StorageGateway,
 )
-from backend.services.text_processor import TextProcessor
-from backend.services.vector_storage import MilvusStorage
+from services.text_processor import TextProcessor
+from services.vector_storage import MilvusStorage
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -828,7 +828,7 @@ class DetectionOrchestrator(BaseService):
 
         created_pairs = await self.add_pairs_to_job(job.id, new_pairs)
 
-        from backend.services.comparison_service import (  # late import to avoid circular
+        from services.comparison_service import (  # late import to avoid circular
             ComparisonConfig,
             ComparisonService,
         )

@@ -7,8 +7,8 @@ from enum import Enum
 from typing import Any
 from uuid import uuid4
 
-from backend.core.logging import get_logger
-from backend.services.base_service import BaseService, singleton
+from core.logging import get_logger
+from services.base_service import BaseService, singleton
 
 logger = get_logger(__name__)
 

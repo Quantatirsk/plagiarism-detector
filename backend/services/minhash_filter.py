@@ -8,8 +8,8 @@ from typing import Any
 
 import numpy as np
 
-from backend.core.logging import get_logger
-from backend.services.base_service import BaseService, singleton
+from core.logging import get_logger
+from services.base_service import BaseService, singleton
 
 logger = get_logger(__name__)
 

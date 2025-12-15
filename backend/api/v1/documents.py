@@ -9,9 +9,9 @@ from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel
 
-from backend.core.logging import get_logger
-from backend.db.models import Document, DocumentStatus
-from backend.services.detection_orchestrator import DetectionOrchestrator
+from core.logging import get_logger
+from db.models import Document, DocumentStatus
+from services.detection_orchestrator import DetectionOrchestrator
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/documents", tags=["Document Library"])
@@ -119,7 +119,7 @@ async def upload_documents(
         raise HTTPException(status_code=404, detail="Project not found")
 
     # Create a parent progress task for batch upload
-    from backend.services.progress_tracker import ProgressTracker, ProgressType
+    from services.progress_tracker import ProgressTracker, ProgressType
     progress_tracker = ProgressTracker()
 
     batch_task_id = progress_tracker.create_task(
@@ -141,8 +141,8 @@ async def upload_documents(
             # Create placeholder document
             import hashlib
 
-            from backend.db import get_session
-            from backend.db.models import Document
+            from db import get_session
+            from db.models import Document
 
             # Generate a temporary checksum for the placeholder
             temp_checksum = hashlib.sha256(f"{upload.filename}_{index}_{project_id}".encode()).hexdigest()

@@ -10,10 +10,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from backend.core.errors import LLMError, create_http_exception
-from backend.models.report_models import ReportGenerationRequest, ReportType
-from backend.services.report_generator_service import ReportGeneratorService
-from backend.services.service_factory import ServiceFactory
+from core.errors import LLMError, create_http_exception
+from models.report_models import ReportGenerationRequest, ReportType
+from services.report_generator_service import ReportGeneratorService
+from services.service_factory import ServiceFactory
 
 router = APIRouter(prefix="/api/v1/reports", tags=["Reports"])
 logger = structlog.get_logger()
@@ -310,7 +310,7 @@ async def get_available_templates():
     返回所有支持的报告类型和语言组合
     """
     try:
-        from backend.services.report_template_service import ReportTemplateService
+        from services.report_template_service import ReportTemplateService
         template_service = ReportTemplateService()
         templates = template_service.get_available_templates()
 

@@ -6,15 +6,15 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from backend.services.minhash_filter import MinHashFilterStage as MinHashService
-from backend.services.pipeline_metrics import metrics_collector
-from backend.services.types import CandidatePayload, SpanPayload
+from services.minhash_filter import MinHashFilterStage as MinHashService
+from services.pipeline_metrics import metrics_collector
+from services.types import CandidatePayload, SpanPayload
 
 from collections.abc import Sequence
 
-from backend.db.models import DocumentChunk
-from backend.services.cross_encoder_service import CrossEncoderService
-from backend.services.embedding_service import EmbeddingService
+from db.models import DocumentChunk
+from services.cross_encoder_service import CrossEncoderService
+from services.embedding_service import EmbeddingService
 
 
 @dataclass

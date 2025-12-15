@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 # Legacy pipeline imports removed
-from backend.services.aggressive_similarity_pipeline import AggressivePipelineConfig
+from services.aggressive_similarity_pipeline import AggressivePipelineConfig
 
 
 class DetectionMode(str, Enum):

@@ -4,23 +4,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
-from backend.core.logging import LogEvent, get_logger
-from backend.db.models import ChunkGranularity, ComparePairStatus, DocumentChunk
-from backend.models.detection_modes import DetectionMode, get_detection_config
+from core.logging import LogEvent, get_logger
+from db.models import ChunkGranularity, ComparePairStatus, DocumentChunk
+from models.detection_modes import DetectionMode, get_detection_config
 
 # Legacy pipeline imports removed
-from backend.services.aggressive_similarity_pipeline import (
+from services.aggressive_similarity_pipeline import (
     AggressiveSimilarityPipeline,
 )
-from backend.services.base_service import BaseService, singleton
-from backend.services.cross_encoder_service import CrossEncoderService
-from backend.services.detection_orchestrator import DetectionOrchestrator
-from backend.services.embedding_service import EmbeddingService
-from backend.services.match_aggregator import MatchAggregator, MatchState
-from backend.services.progress_tracker import ProgressTracker
-from backend.services.storage_gateway import MatchDetailCreate, MatchGroupCreate
-from backend.services.text_processor import TextProcessor
-from backend.services.types import CandidatePayload, SpanPayload
+from services.base_service import BaseService, singleton
+from services.cross_encoder_service import CrossEncoderService
+from services.detection_orchestrator import DetectionOrchestrator
+from services.embedding_service import EmbeddingService
+from services.match_aggregator import MatchAggregator, MatchState
+from services.progress_tracker import ProgressTracker
+from services.storage_gateway import MatchDetailCreate, MatchGroupCreate
+from services.text_processor import TextProcessor
+from services.types import CandidatePayload, SpanPayload
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -172,7 +172,7 @@ class ComparisonService(BaseService):
 
             # Apply bidirectional filtering if requested
             if config.match_strategy in ["bidirectional_stable", "bidirectional_relaxed"]:
-                from backend.services.bidirectional_match_filter import BidirectionalMatchFilter
+                from services.bidirectional_match_filter import BidirectionalMatchFilter
 
                 filter = BidirectionalMatchFilter(results)
                 if config.match_strategy == "bidirectional_stable":

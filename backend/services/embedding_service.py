@@ -9,9 +9,9 @@ from typing import Any
 import openai
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from backend.core.errors import EmbeddingError
-from backend.repositories.redis import RedisCache
-from backend.services.base_service import BaseService, singleton
+from core.errors import EmbeddingError
+from repositories.redis import RedisCache
+from services.base_service import BaseService, singleton
 
 
 @singleton

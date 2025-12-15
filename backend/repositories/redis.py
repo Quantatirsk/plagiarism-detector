@@ -7,9 +7,9 @@ from typing import Any
 
 import redis.asyncio as redis
 
-from backend.core.config import get_settings
-from backend.core.errors import RedisError
-from backend.core.logging import get_logger
+from core.config import get_settings
+from core.errors import RedisError
+from core.logging import get_logger
 
 logger = get_logger(__name__)
 settings = get_settings()

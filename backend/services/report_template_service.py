@@ -3,8 +3,8 @@
 """
 from typing import Any
 
-from backend.models.report_models import ReportTemplate, ReportType
-from backend.services.base_service import BaseService, singleton
+from models.report_models import ReportTemplate, ReportType
+from services.base_service import BaseService, singleton
 
 
 @singleton

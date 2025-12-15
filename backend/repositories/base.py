@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Any, Generic, TypeVar
 
-from backend.core.logging import get_logger
+from core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -66,7 +66,7 @@ class CacheableRepository(BaseRepository[T, K]):
 
     async def invalidate_cache(self, entity_id: K):
         """无效化相关缓存"""
-        from backend.repositories.redis import get_redis
+        from repositories.redis import get_redis
 
         try:
             redis = get_redis()
@@ -84,7 +84,7 @@ class CacheableRepository(BaseRepository[T, K]):
 
     async def get_cached(self, key: str, default: Any = None) -> Any:
         """从缓存获取数据"""
-        from backend.repositories.redis import get_redis
+        from repositories.redis import get_redis
 
         try:
             redis = get_redis()
@@ -100,7 +100,7 @@ class CacheableRepository(BaseRepository[T, K]):
         ttl: int | timedelta | None = None
     ) -> bool:
         """设置缓存数据"""
-        from backend.repositories.redis import get_redis
+        from repositories.redis import get_redis
 
         try:
             redis = get_redis()
@@ -266,7 +266,7 @@ def cached_result(ttl: int = 3600):
 
             try:
                 # 尝试从缓存获取
-                from backend.repositories.redis import get_redis
+                from repositories.redis import get_redis
                 redis = get_redis()
                 cached_result = await redis.get(cache_key)
 

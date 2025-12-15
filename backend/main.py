@@ -5,10 +5,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from backend.api.v1 import compare, documents, health, llm, metrics, progress, projects, reports
-from backend.core.config import get_settings
-from backend.core.middleware import error_handler
-from backend.db import init_db
+from api.v1 import compare, documents, health, llm, metrics, progress, projects, reports
+from core.config import get_settings
+from core.middleware import error_handler
+from db import init_db
 
 # 配置结构化日志
 structlog.configure(

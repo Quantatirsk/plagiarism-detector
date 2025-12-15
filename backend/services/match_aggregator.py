@@ -4,12 +4,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
-from backend.services.types import SpanPayload
+from services.types import SpanPayload
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from backend.db.models import DocumentChunk
+    from db.models import DocumentChunk
 
 
 @dataclass

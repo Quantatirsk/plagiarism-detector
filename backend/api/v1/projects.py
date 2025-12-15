@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.core.logging import get_logger
-from backend.db.models import CompareJobStatus
-from backend.services.detection_orchestrator import DetectionOrchestrator
-from backend.db.models import CompareJob, Project
+from core.logging import get_logger
+from db.models import CompareJobStatus
+from services.detection_orchestrator import DetectionOrchestrator
+from db.models import CompareJob, Project
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/projects", tags=["Projects"])
@@ -135,8 +135,8 @@ async def run_project_comparisons(
     # Check if there are enough documents
     from sqlalchemy import select
 
-    from backend.db import get_session
-    from backend.db.models import Document, DocumentStatus
+    from db import get_session
+    from db.models import Document, DocumentStatus
 
     async with get_session() as session:
         stmt = (
@@ -153,7 +153,7 @@ async def run_project_comparisons(
         )
 
     # Create a progress task for the comparison job
-    from backend.services.progress_tracker import ProgressTracker, ProgressType
+    from services.progress_tracker import ProgressTracker, ProgressType
     progress_tracker = ProgressTracker()
 
     comparison_task_id = progress_tracker.create_task(

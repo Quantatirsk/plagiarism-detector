@@ -4,8 +4,8 @@ Following Linus principle: Keep it simple and practical
 """
 from typing import TypeVar, cast
 
-from backend.core.config import get_settings
-from backend.core.logging import get_logger
+from core.config import get_settings
+from core.logging import get_logger
 
 # Type variable for singleton decorator
 T = TypeVar('T')

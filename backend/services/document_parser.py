@@ -12,8 +12,8 @@
 from pathlib import Path
 from typing import Any
 
-from backend.services.base_service import BaseService, singleton
-from backend.tools.readers import get_readers_service
+from services.base_service import BaseService, singleton
+from tools.readers import get_readers_service
 
 
 @singleton

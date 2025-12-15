@@ -5,13 +5,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Qu
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import NoResultFound
 
-from backend.core.logging import get_logger
-from backend.db.models import ChunkGranularity, CompareJobStatus, ComparePairStatus
+from core.logging import get_logger
+from db.models import ChunkGranularity, CompareJobStatus, ComparePairStatus
 
 # Legacy pipeline imports removed
-from backend.models.detection_modes import DetectionMode
-from backend.services.comparison_service import ComparisonConfig, ComparisonService
-from backend.services.detection_orchestrator import DetectionOrchestrator
+from models.detection_modes import DetectionMode
+from services.comparison_service import ComparisonConfig, ComparisonService
+from services.detection_orchestrator import DetectionOrchestrator
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/compare-jobs", tags=["Comparison"])

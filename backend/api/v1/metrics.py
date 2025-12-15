@@ -4,9 +4,9 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from backend.services.cross_encoder_service import CrossEncoderService
-from backend.services.minhash_filter import MinHashFilterStage
-from backend.services.pipeline_metrics import metrics_collector
+from services.cross_encoder_service import CrossEncoderService
+from services.minhash_filter import MinHashFilterStage
+from services.pipeline_metrics import metrics_collector
 
 router = APIRouter(prefix="/api/v1/metrics", tags=["Metrics"])
 

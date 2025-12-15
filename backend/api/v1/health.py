@@ -3,8 +3,8 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.api.deps import get_health_service
-from backend.services.health_service import HealthService
+from api.deps import get_health_service
+from services.health_service import HealthService
 
 router = APIRouter()
 logger = structlog.get_logger()

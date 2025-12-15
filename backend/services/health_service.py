@@ -6,8 +6,8 @@ from typing import Any
 
 import openai
 
-from backend.core.config import MilvusMode
-from backend.services.base_service import BaseService
+from core.config import MilvusMode
+from services.base_service import BaseService
 
 
 class HealthService(BaseService):

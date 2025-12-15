@@ -12,17 +12,17 @@ SPECIALIZED_PARSERS = {
     '.pdf': ('tools.readers.readers_pdf', 'PDFParser'),
     '.docx': ('tools.readers.readers_docx', 'DOCXParser'),
     '.doc': ('tools.readers.readers_doc', 'DOCParser'),
-    
+
     # Excel 格式 - 统一解析器支持多种格式
     '.xlsx': ('tools.readers.readers_excel', 'ExcelParser'),
     '.xls': ('tools.readers.readers_excel', 'ExcelParser'),
     '.xlsb': ('tools.readers.readers_excel', 'ExcelParser'),
     '.ods': ('tools.readers.readers_excel', 'ExcelParser'),
-    
+
     # 结构化数据 - 需要特殊处理
     '.json': ('tools.readers.readers_json', 'JSONParser'),
     '.csv': ('tools.readers.readers_csv', 'CSVParser'),
-    
+
     # 图像格式 - 二进制文件
     '.png': ('tools.readers.readers_image', 'ImageParser'),
     '.jpg': ('tools.readers.readers_image', 'ImageParser'),
@@ -31,7 +31,7 @@ SPECIALIZED_PARSERS = {
     '.tiff': ('tools.readers.readers_image', 'ImageParser'),
     '.gif': ('tools.readers.readers_image', 'ImageParser'),
     '.webp': ('tools.readers.readers_image', 'ImageParser'),
-    
+
     # 媒体格式（可选）
     '.mp3': ('tools.media.media_audio_parser', 'AudioParser'),
     '.wav': ('tools.media.media_audio_parser', 'AudioParser'),

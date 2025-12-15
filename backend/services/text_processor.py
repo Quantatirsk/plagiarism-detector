@@ -11,7 +11,7 @@ import spacy
 from langdetect import LangDetectException, detect
 from spacy.language import Language
 
-from backend.services.base_service import BaseService, singleton
+from services.base_service import BaseService, singleton
 
 
 @singleton

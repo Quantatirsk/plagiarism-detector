@@ -8,8 +8,8 @@ from typing import Any
 import openai
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from backend.core.errors import LLMError
-from backend.services.base_service import BaseService, singleton
+from core.errors import LLMError
+from services.base_service import BaseService, singleton
 
 
 @singleton

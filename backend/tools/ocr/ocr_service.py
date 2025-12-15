@@ -20,7 +20,7 @@ from typing import cast
 import aiofiles
 import httpx
 
-from backend.infrastructure.http.async_client_manager import get_async_client
+from infrastructure.http.async_client_manager import get_async_client
 
 from .ocr_config import ocr_config
 

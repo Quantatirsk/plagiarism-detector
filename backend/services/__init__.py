@@ -3,10 +3,10 @@
 """
 
 # 导出基础服务类和装饰器
-from backend.services.base_service import BaseService, singleton
+from services.base_service import BaseService, singleton
 
 # 导出服务工厂
-from backend.services.service_factory import ServiceFactory
+from services.service_factory import ServiceFactory
 
 __all__ = [
     # 基础类

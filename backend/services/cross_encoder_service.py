@@ -7,7 +7,7 @@ from collections import OrderedDict
 from time import time
 from typing import Any
 
-from backend.services.base_service import BaseService, singleton
+from services.base_service import BaseService, singleton
 
 from collections.abc import Sequence
 
@@ -23,8 +23,8 @@ class CrossEncoderService(BaseService):
     CACHE_TTL = 3600    # Time-to-live in seconds (1 hour)
 
     def _initialize(self) -> None:
-        from backend.services.jina_reranker import JinaRerankFunction
-        from backend.services.openai_reranker import OpenAIRerankFunction
+        from services.jina_reranker import JinaRerankFunction
+        from services.openai_reranker import OpenAIRerankFunction
 
         self._reranker: JinaRerankFunction | OpenAIRerankFunction
         self.provider = self.settings.reranker_provider.lower()

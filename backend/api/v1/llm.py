@@ -10,9 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from backend.api.deps import get_llm_service
-from backend.core.errors import LLMError, create_http_exception
-from backend.services.llm_service import LLMService
+from api.deps import get_llm_service
+from core.errors import LLMError, create_http_exception
+from services.llm_service import LLMService
 
 router = APIRouter(prefix="/api/v1/llm", tags=["LLM"])
 logger = structlog.get_logger()

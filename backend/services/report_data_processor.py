@@ -8,10 +8,10 @@ from typing import Any
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from backend.api.v1.compare import MatchDetailModel, MatchGroup, PairReportResponse, PairResponse
-from backend.db import get_session
-from backend.db.models import CompareJob, ComparePair, Document, DocumentChunk, Project
-from backend.models.report_models import (
+from api.v1.compare import MatchDetailModel, MatchGroup, PairReportResponse, PairResponse
+from db import get_session
+from db.models import CompareJob, ComparePair, Document, DocumentChunk, Project
+from models.report_models import (
     ComparisonReportData,
     DocumentReportData,
     MatchDetail,
@@ -20,8 +20,8 @@ from backend.models.report_models import (
     RiskLevel,
     SimilaritySource,
 )
-from backend.services.base_service import BaseService, singleton
-from backend.services.service_factory import ServiceFactory
+from services.base_service import BaseService, singleton
+from services.service_factory import ServiceFactory
 
 
 @singleton
